@@ -12,7 +12,7 @@ use axum::headers::{ETag, IfNoneMatch};
 use axum::http::StatusCode;
 use axum::response::{self, IntoResponse, Response};
 use axum::TypedHeader;
-use http::header;
+use http::{header, HeaderMap};
 use log::warn;
 use p2panda_rs::document::traits::AsDocument;
 use p2panda_rs::document::{DocumentId, DocumentViewId};
@@ -23,6 +23,7 @@ use tokio::fs::File;
 use tokio_util::io::ReaderStream;
 
 use crate::http::context::HttpServiceContext;
+use crate::api::Token;
 
 /// Handle GraphQL playground requests at the given path.
 pub async fn handle_graphql_playground(path: &str) -> impl IntoResponse {
@@ -32,9 +33,15 @@ pub async fn handle_graphql_playground(path: &str) -> impl IntoResponse {
 /// Handle GraphQL requests.
 pub async fn handle_graphql_query(
     Extension(context): Extension<HttpServiceContext>,
+    headers: HeaderMap,
     req: GraphQLRequest,
 ) -> GraphQLResponse {
-    context.schema.execute(req.into_inner()).await.into()
+    let mut req = req.into_inner();
+    if let Some(val) = headers.get("x-token") {
+        let pub_key = val.to_str().map(|s| Token(s.to_string())).ok();
+        req = req.data(pub_key);
+    }
+    context.schema.execute(req).await.into()
 }
 
 /// Handle requests for a blob document served via HTTP.

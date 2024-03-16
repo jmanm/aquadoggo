@@ -8,6 +8,7 @@ pub mod queries;
 pub mod resolvers;
 pub mod responses;
 pub mod scalars;
+pub mod guards;
 mod schema;
 #[cfg(test)]
 mod tests;

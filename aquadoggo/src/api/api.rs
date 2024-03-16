@@ -6,6 +6,8 @@ use crate::api::{migrate, LockFile};
 use crate::bus::{ServiceMessage, ServiceSender};
 use crate::context::Context;
 
+pub struct Token(pub String);
+
 /// Interface to interact with the node in a programmatic, "low-level" way.
 #[derive(Debug)]
 pub struct NodeInterface {
