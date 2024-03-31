@@ -1,5 +1,7 @@
 target/
 debug/
+db/
+private-key.txt
 
 # Config files
 config.toml

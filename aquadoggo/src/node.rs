@@ -15,6 +15,7 @@ use crate::manager::ServiceManager;
 use crate::materializer::materializer_service;
 use crate::network::network_service;
 use crate::replication::replication_service;
+use crate::rpc::service::rpc_service;
 use crate::schema::SchemaProvider;
 use crate::LockFile;
 
@@ -83,6 +84,10 @@ impl Node {
         // Start HTTP server with GraphQL API
         if manager.add("http", http_service).await.is_err() {
             panic!("Failed starting HTTP service");
+        }
+
+        if manager.add("rpc", rpc_service).await.is_err() {
+            panic!("Failed starting  gRPC service");
         }
 
         // Start network service
