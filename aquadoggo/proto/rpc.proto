@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package rpc;
+
+service Connect {
+  rpc Publish(Document) returns (NextArgs) {}
+}
+
+message Document {
+  bytes entry = 1;
+  bytes operation = 2;
+}
+
+message NextArgs {
+  uint64 log_id = 1;
+  uint64 seq_num = 2;
+  optional string backlink = 3;
+  optional string skiplink = 4;
+}
