@@ -23,6 +23,10 @@ mod manager;
 mod materializer;
 mod network;
 mod node;
+mod aquadoggo_rpc {
+    tonic::include_proto!("rpc");
+}
+mod rpc;
 #[cfg(all(test, feature = "proptests"))]
 mod proptests;
 mod replication;
