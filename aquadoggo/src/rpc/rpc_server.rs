@@ -28,8 +28,12 @@ impl RpcServer {
 impl Connect for RpcServer {
     async fn publish(&self, request: Request<Document>) -> Result<Response<NextArgs>> {
         let req = request.into_inner();
-        let encoded_entry = EncodedEntry::from_bytes(&req.entry);
-        let encoded_operation = EncodedOperation::from_bytes(&req.operation);
+        
+        let entry_bytes = hex::decode(&req.entry).or_else(|e| Err(Status::invalid_argument(e.to_string())))?;
+        let encoded_entry = EncodedEntry::from_bytes(&entry_bytes);
+        
+        let op_bytes = hex::decode(&req.operation).or_else(|e| Err(Status::invalid_argument(e.to_string())))?;
+        let encoded_operation = EncodedOperation::from_bytes(&op_bytes);
 
         debug!(
             "Query to publish received containing entry with hash {}",

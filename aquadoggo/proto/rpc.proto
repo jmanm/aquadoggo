@@ -7,8 +7,8 @@ service Connect {
 }
 
 message Document {
-  bytes entry = 1;
-  bytes operation = 2;
+  string entry = 1;
+  string operation = 2;
 }
 
 message NextArgs {
