@@ -3,7 +3,8 @@ syntax = "proto3";
 package rpc;
 
 service Connect {
-  rpc Publish(Document) returns (NextArgs) {}
+  rpc NextArgs(NextArgsRequest) returns (NextArgsResponse) {}
+  rpc Publish(Document) returns (NextArgsResponse) {}
 }
 
 message Document {
@@ -11,7 +12,12 @@ message Document {
   string operation = 2;
 }
 
-message NextArgs {
+message NextArgsRequest {
+  string public_key = 1;
+  optional string document_view_id = 2;
+}
+
+message NextArgsResponse {
   uint64 log_id = 1;
   uint64 seq_num = 2;
   optional string backlink = 3;
