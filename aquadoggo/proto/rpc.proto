@@ -3,18 +3,63 @@ syntax = "proto3";
 package rpc;
 
 service Connect {
-  rpc NextArgs(NextArgsRequest) returns (NextArgsResponse) {}
-  rpc Publish(Document) returns (NextArgsResponse) {}
+  rpc GetDocument(DocumentRequest) returns (DocumentResponse) {}
+  rpc GetNextArgs(NextArgsRequest) returns (NextArgsResponse) {}
+  rpc DoPublish(PublishRequest) returns (NextArgsResponse) {}
+}
+
+message DocumentRequest {
+  optional string document_id = 1;
+  optional string document_view_id = 2;
+}
+
+message Empty {}
+
+message DocumentResponse {
+  optional Document document = 1;
+}
+
+message DocumentMeta {
+  string document_id = 1;
+  string view_id = 2;
+  string owner = 3;
 }
 
 message Document {
-  string entry = 1;
-  string operation = 2;
+  DocumentMeta meta = 1;
+  repeated Field fields = 2;
+}
+
+enum FieldType {
+  Doc = 0;
+  String = 1;
+  Int = 2;
+  Float = 3;
+  Bool = 4;
+  Bytes = 5;
+}
+
+message Field {
+  FieldType data_type = 1;
+  string name = 2;
+  oneof value {
+    Document doc_val = 3;
+    string string_val = 4;
+    sint64 int_val = 5;
+    double float_val = 6;
+    bool bool_val = 7;
+    bytes byte_val = 8;
+  }
 }
 
 message NextArgsRequest {
   string public_key = 1;
   optional string document_view_id = 2;
+}
+
+message PublishRequest {
+  string entry = 1;
+  string operation = 2;
 }
 
 message NextArgsResponse {
