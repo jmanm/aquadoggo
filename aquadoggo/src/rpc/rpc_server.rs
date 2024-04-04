@@ -1,17 +1,22 @@
-use futures::TryFutureExt;
 use log::debug;
 use p2panda_rs::api::{self, publish};
-use p2panda_rs::document::DocumentViewId;
+use p2panda_rs::document::{DocumentId, DocumentViewId, DocumentViewValue};
 use p2panda_rs::identity::PublicKey;
+use p2panda_rs::operation::OperationValue;
 use p2panda_rs::operation::{decode::decode_operation, traits::Schematic, EncodedOperation, OperationId};
 use p2panda_rs::entry::{EncodedEntry, traits::AsEncodedEntry};
+use p2panda_rs::storage_provider::traits::DocumentStore;
 use std::str::FromStr;
 use tonic::{Request, Response, Result, Status};
 
-use crate::aquadoggo_rpc::{NextArgsRequest, Document, NextArgsResponse};
+use crate::aquadoggo_rpc::field::Value;
+use crate::aquadoggo_rpc::{Document, DocumentMeta, DocumentRequest, DocumentResponse, Field, NextArgsRequest, NextArgsResponse, PublishRequest};
 use crate::aquadoggo_rpc::connect_server::Connect;
 use crate::bus::{ServiceMessage, ServiceSender};
 use crate::context::Context;
+use crate::db::types::StorageDocument;
+use crate::db::SqlStore;
+
 
 pub struct RpcServer {
     context: Context,
@@ -25,11 +30,131 @@ impl RpcServer {
             tx,
         }
     }
+
+    async fn get_document_from_store(&self, document_id: Option<DocumentId>, document_view_id: Option<DocumentViewId>) -> Result<Option<StorageDocument>> {
+        match (document_id, document_view_id) {
+            (None, Some(document_view_id)) => {
+                self.context.store
+                    .get_document_by_view_id(&DocumentViewId::from(document_view_id.to_owned()))
+                    .await
+                    .or_else(|e| Err(Status::internal(e.to_string())))
+            }
+            (Some(document_id), None) => self.context.store.get_document(&DocumentId::from(document_id))
+                .await
+                .or_else(|e| Err(Status::internal(e.to_string()))),
+            _ => panic!("Invalid values passed from query field parent"),
+        }
+    }
+
+    fn build_field(&self, field_name: &String, val: &DocumentViewValue) -> Field {
+        let name = field_name.clone();
+        match val.value() {
+            OperationValue::Boolean(bool) => Field {
+                name,
+                data_type: 4,
+                value: Some(Value::BoolVal(bool.clone()))
+            },
+
+            OperationValue::Bytes(vec) => Field {
+                name,
+                data_type: 8,
+                value: Some(Value::ByteVal(vec.clone()))
+            },
+
+            OperationValue::Integer(int) => Field {
+                name,
+                data_type: 2,
+                value: Some(Value::IntVal(int.clone()))
+            },
+
+            OperationValue::Float(float) => Field {
+                name,
+                data_type: 3,
+                value: Some(Value::FloatVal(float.clone()))
+            },
+
+            OperationValue::String(string) => Field {
+                name,
+                data_type: 1,
+                value: Some(Value::StringVal(string.clone()))
+            },
+
+            OperationValue::Relation(relation) => Field {
+                name,
+                data_type: 0,
+                value: None /* Some(Value::DocVal(
+                    self.build_document(
+                        self.get_document_from_store(relation.document_id())
+                    )
+                ))*/
+            },
+
+            // OperationValue::RelationList(RelationList),
+
+            // OperationValue::PinnedRelation(PinnedRelation),
+
+            // OperationValue::PinnedRelationList(PinnedRelationList),
+
+            _ => Field {
+                name,
+                data_type: 0,
+                value: None
+            }
+        }
+    }
+
+    fn build_document(&self, document: StorageDocument) -> Document {
+        let meta = Some(DocumentMeta {
+            document_id: document.id.to_string(),
+            view_id: document.view_id.to_string(),
+            owner: document.author.to_string()
+        });
+
+        let fields = match document.fields {
+            Some(fields) => fields
+                .iter()
+                .map(|(name, val)| self.build_field(name, val))
+                .collect(),
+            None => vec![]
+        };
+
+        Document {
+            meta,
+            fields
+        }
+    }
 }
 
 #[tonic::async_trait]
 impl Connect for RpcServer {
-    async fn next_args(&self, request: Request<NextArgsRequest>) -> Result<Response<NextArgsResponse>> {
+    async fn get_document(&self, request: Request<DocumentRequest>) -> Result<Response<DocumentResponse>> {
+        let req = request.into_inner();
+        let document_id = match req.document_id {
+            Some(id) => {
+                let doc_id = DocumentId::from_str(&id).or_else(|e| Err(Status::invalid_argument(e.to_string())))?;
+                Some(doc_id)
+            }
+            None => None
+        };
+        let document_view_id = match req.document_view_id {
+            Some(id) => {
+                let view_id = DocumentViewId::from_str(&id).or_else(|e| Err(Status::invalid_argument(e.to_string())))?;
+                Some(view_id)
+            },
+            None => None
+        };
+
+        let document = self.get_document_from_store(document_id, document_view_id)
+            .await?;
+        let doc_response = match document {
+            Some(document) => DocumentResponse { document: Some(self.build_document(document)) },
+            None => DocumentResponse { document: None },
+        };
+        
+        Ok(Response::new(doc_response))
+    }
+
+    async fn get_next_args(&self, request: Request<NextArgsRequest>) -> Result<Response<NextArgsResponse>> {
         let req = request.into_inner();
         
         let public_key = PublicKey::new(&req.public_key)
@@ -61,7 +186,7 @@ impl Connect for RpcServer {
         Ok(Response::new(next_args))
     }
 
-    async fn publish(&self, request: Request<Document>) -> Result<Response<NextArgsResponse>> {
+    async fn do_publish(&self, request: Request<PublishRequest>) -> Result<Response<NextArgsResponse>> {
         let req = request.into_inner();
         
         let entry_bytes = hex::decode(&req.entry).or_else(|e| Err(Status::invalid_argument(e.to_string())))?;
