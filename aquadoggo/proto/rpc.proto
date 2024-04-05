@@ -3,17 +3,89 @@ syntax = "proto3";
 package rpc;
 
 service Connect {
+  rpc GetCollection(CollectionRequest) returns (CollectionResponse) {}
   rpc GetDocument(DocumentRequest) returns (DocumentResponse) {}
   rpc GetNextArgs(NextArgsRequest) returns (NextArgsResponse) {}
   rpc DoPublish(PublishRequest) returns (NextArgsResponse) {}
+}
+
+message CollectionRequest {
+  optional Pagination pagination = 1;
+  optional Order order = 2;
+  repeated FilterSetting filter = 3;
+}
+
+message Pagination {
+  uint64 first = 1;
+  optional PaginationCursor after = 2;
+  repeated PaginationField fields = 3;
+}
+
+enum PaginationField {
+  TotalCount = 0;
+  HasNextPage = 1;
+  HasPreviousPage = 2;
+  StartCursor = 3;
+  EndCursor = 4;
+}
+
+message PaginationCursor {
+  string operation_cursor = 1;
+  optional string root_operation_cursor = 2;
+  optional string root_view_id = 3;
+}
+
+message Order {
+  oneof field {
+    MetaField meta = 1;
+    string field_name = 2;
+  }
+  Direction direction = 3;
+}
+
+enum MetaField {
+  DocumentId = 0;
+  DocumentViewId = 1;
+  Owner = 2;
+  Edited = 3;
+  Deleted = 4;
+}
+
+enum Direction {
+  Ascending = 0;
+  Descending = 1;
+}
+
+message FilterSetting {
+  oneof filter_by {
+    MetaField meta = 1;
+    Field field = 2;
+  }
+  bool exclusive = 3;
+}
+
+message CollectionResponse {
+  PaginationData pagination = 1;
+  repeated DocumentCursorTuple documents = 2;
+}
+
+message DocumentCursorTuple {
+  PaginationCursor cursor = 1;
+  Document document = 2;
+}
+
+message PaginationData {
+  uint64 total_count = 1;
+  bool has_next_page = 2;
+  bool has_previous_page = 3;
+  optional PaginationCursor start_cursor = 4;
+  optional PaginationCursor end_cursor = 5;
 }
 
 message DocumentRequest {
   optional string document_id = 1;
   optional string document_view_id = 2;
 }
-
-message Empty {}
 
 message DocumentResponse {
   optional Document document = 1;
