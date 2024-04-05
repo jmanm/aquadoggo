@@ -1,3 +1,5 @@
+use async_recursion::async_recursion;
+use futures::future;
 use log::debug;
 use p2panda_rs::api::{self, publish};
 use p2panda_rs::document::{DocumentId, DocumentViewId, DocumentViewValue};
@@ -15,7 +17,6 @@ use crate::aquadoggo_rpc::connect_server::Connect;
 use crate::bus::{ServiceMessage, ServiceSender};
 use crate::context::Context;
 use crate::db::types::StorageDocument;
-use crate::db::SqlStore;
 
 
 pub struct RpcServer {
@@ -32,23 +33,18 @@ impl RpcServer {
     }
 
     async fn get_document_from_store(&self, document_id: Option<DocumentId>, document_view_id: Option<DocumentViewId>) -> Result<Option<StorageDocument>> {
-        match (document_id, document_view_id) {
-            (None, Some(document_view_id)) => {
-                self.context.store
-                    .get_document_by_view_id(&DocumentViewId::from(document_view_id.to_owned()))
-                    .await
-                    .or_else(|e| Err(Status::internal(e.to_string())))
-            }
-            (Some(document_id), None) => self.context.store.get_document(&DocumentId::from(document_id))
-                .await
-                .or_else(|e| Err(Status::internal(e.to_string()))),
+        let doc = match (document_id, document_view_id) {
+            (None, Some(document_view_id)) => self.context.store
+                .get_document_by_view_id(&DocumentViewId::from(document_view_id.to_owned())).await,
+            (Some(document_id), None) => self.context.store
+                .get_document(&DocumentId::from(document_id)).await,
             _ => panic!("Invalid values passed from query field parent"),
-        }
+        };
+        doc.or_else(|e| Err(Status::internal(e.to_string())))
     }
 
-    fn build_field(&self, field_name: &String, val: &DocumentViewValue) -> Field {
-        let name = field_name.clone();
-        match val.value() {
+    async fn build_field(&self, name: String, val: DocumentViewValue) -> Result<Field> {
+        let field = match val.value() {
             OperationValue::Boolean(bool) => Field {
                 name,
                 data_type: 4,
@@ -79,14 +75,17 @@ impl RpcServer {
                 value: Some(Value::StringVal(string.clone()))
             },
 
-            OperationValue::Relation(relation) => Field {
-                name,
-                data_type: 0,
-                value: None /* Some(Value::DocVal(
-                    self.build_document(
-                        self.get_document_from_store(relation.document_id())
-                    )
-                ))*/
+            OperationValue::Relation(relation) => {
+                let related_doc = self.get_document_from_store(Some(relation.document_id().clone()), None)
+                    .await?
+                    .unwrap();
+                Field {
+                    name,
+                    data_type: 0,
+                    value: Some(Value::DocVal(
+                        self.build_document(related_doc).await?
+                    ))
+                }
             },
 
             // OperationValue::RelationList(RelationList),
@@ -100,28 +99,31 @@ impl RpcServer {
                 data_type: 0,
                 value: None
             }
-        }
+        };
+        Ok(field)
     }
 
-    fn build_document(&self, document: StorageDocument) -> Document {
+    #[async_recursion]
+    async fn build_document(&self, document: StorageDocument) -> Result<Document> {
         let meta = Some(DocumentMeta {
             document_id: document.id.to_string(),
             view_id: document.view_id.to_string(),
             owner: document.author.to_string()
         });
 
-        let fields = match document.fields {
+        let futures = match document.fields {
             Some(fields) => fields
                 .iter()
-                .map(|(name, val)| self.build_field(name, val))
+                .map(|(name, val)| self.build_field(name.clone(), val.clone()))
                 .collect(),
             None => vec![]
         };
+        let fields = future::try_join_all(futures).await?;
 
-        Document {
+        Ok(Document {
             meta,
             fields
-        }
+        })
     }
 }
 
@@ -144,10 +146,10 @@ impl Connect for RpcServer {
             None => None
         };
 
-        let document = self.get_document_from_store(document_id, document_view_id)
-            .await?;
+        // TODO - preload all related documents from store - possibly leverage get_child_document_ids()?
+        let document = self.get_document_from_store(document_id, document_view_id).await?;
         let doc_response = match document {
-            Some(document) => DocumentResponse { document: Some(self.build_document(document)) },
+            Some(document) => DocumentResponse { document: Some(self.build_document(document).await?) },
             None => DocumentResponse { document: None },
         };
         
