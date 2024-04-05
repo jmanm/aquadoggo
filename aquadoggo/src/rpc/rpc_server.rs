@@ -12,7 +12,7 @@ use std::str::FromStr;
 use tonic::{Request, Response, Result, Status};
 
 use crate::aquadoggo_rpc::field::Value;
-use crate::aquadoggo_rpc::{Document, DocumentMeta, DocumentRequest, DocumentResponse, Field, NextArgsRequest, NextArgsResponse, PublishRequest};
+use crate::aquadoggo_rpc::{CollectionRequest, CollectionResponse, Document, DocumentMeta, DocumentRequest, DocumentResponse, Field, NextArgsRequest, NextArgsResponse, PublishRequest};
 use crate::aquadoggo_rpc::connect_server::Connect;
 use crate::bus::{ServiceMessage, ServiceSender};
 use crate::context::Context;
@@ -90,7 +90,18 @@ impl RpcServer {
 
             // OperationValue::RelationList(RelationList),
 
-            // OperationValue::PinnedRelation(PinnedRelation),
+            OperationValue::PinnedRelation(pinned_relation) => {
+                let related_doc = self.get_document_from_store(None, Some(pinned_relation.view_id().clone()))
+                    .await?
+                    .unwrap();
+                Field {
+                    name,
+                    data_type: 0,
+                    value: Some(Value::DocVal(
+                        self.build_document(related_doc).await?
+                    ))
+                }
+            },
 
             // OperationValue::PinnedRelationList(PinnedRelationList),
 
@@ -129,6 +140,10 @@ impl RpcServer {
 
 #[tonic::async_trait]
 impl Connect for RpcServer {
+    async fn get_collection(&self, request: Request<CollectionRequest>) -> Result<Response<CollectionResponse>> {
+        let req = request.into_inner();
+    }
+
     async fn get_document(&self, request: Request<DocumentRequest>) -> Result<Response<DocumentResponse>> {
         let req = request.into_inner();
         let document_id = match req.document_id {
