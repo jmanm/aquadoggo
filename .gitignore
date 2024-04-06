@@ -9,3 +9,4 @@ config.toml
 
 # IDE
 .vscode
+.DS_Store
