@@ -10,9 +10,10 @@ service Connect {
 }
 
 message CollectionRequest {
-  optional Pagination pagination = 1;
-  optional Order order = 2;
-  repeated FilterSetting filter = 3;
+  string schema_id = 1;
+  optional Pagination pagination = 2;
+  optional Order order = 3;
+  repeated FilterSetting filter = 4;
 }
 
 message Pagination {

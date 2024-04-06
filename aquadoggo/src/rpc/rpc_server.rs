@@ -7,15 +7,17 @@ use p2panda_rs::identity::PublicKey;
 use p2panda_rs::operation::OperationValue;
 use p2panda_rs::operation::{decode::decode_operation, traits::Schematic, EncodedOperation, OperationId};
 use p2panda_rs::entry::{EncodedEntry, traits::AsEncodedEntry};
+use p2panda_rs::schema::SchemaId;
 use p2panda_rs::storage_provider::traits::DocumentStore;
 use std::str::FromStr;
 use tonic::{Request, Response, Result, Status};
 
 use crate::aquadoggo_rpc::field::Value;
-use crate::aquadoggo_rpc::{CollectionRequest, CollectionResponse, Document, DocumentMeta, DocumentRequest, DocumentResponse, Field, NextArgsRequest, NextArgsResponse, PublishRequest};
+use crate::aquadoggo_rpc::{CollectionRequest, CollectionResponse, Document, DocumentCursorTuple, DocumentMeta, DocumentRequest, DocumentResponse, Field, NextArgsRequest, NextArgsResponse, PaginationCursor, PaginationData, PublishRequest};
 use crate::aquadoggo_rpc::connect_server::Connect;
 use crate::bus::{ServiceMessage, ServiceSender};
 use crate::context::Context;
+use crate::db::stores;
 use crate::db::types::StorageDocument;
 
 
@@ -41,6 +43,19 @@ impl RpcServer {
             _ => panic!("Invalid values passed from query field parent"),
         };
         doc.or_else(|e| Err(Status::internal(e.to_string())))
+    }
+
+    async fn get_document_cursor_tuple(&self, cur: &stores::PaginationCursor, doc: &StorageDocument) -> Result<DocumentCursorTuple> {
+        let cursor = PaginationCursor {
+            operation_cursor: cur.operation_cursor.to_string(),
+            root_operation_cursor: cur.root_operation_cursor.as_ref().map(|c| c.to_string()),
+            root_view_id: cur.root_view_id.as_ref().map(|id| id.to_string())
+        };
+        let document = self.build_document(doc).await?;
+        Ok(DocumentCursorTuple {
+            cursor: Some(cursor),
+            document: Some(document),
+        })
     }
 
     async fn build_field(&self, name: String, val: DocumentViewValue) -> Result<Field> {
@@ -83,7 +98,7 @@ impl RpcServer {
                     name,
                     data_type: 0,
                     value: Some(Value::DocVal(
-                        self.build_document(related_doc).await?
+                        self.build_document(&related_doc).await?
                     ))
                 }
             },
@@ -98,7 +113,7 @@ impl RpcServer {
                     name,
                     data_type: 0,
                     value: Some(Value::DocVal(
-                        self.build_document(related_doc).await?
+                        self.build_document(&related_doc).await?
                     ))
                 }
             },
@@ -115,14 +130,14 @@ impl RpcServer {
     }
 
     #[async_recursion]
-    async fn build_document(&self, document: StorageDocument) -> Result<Document> {
+    async fn build_document(&self, document: &StorageDocument) -> Result<Document> {
         let meta = Some(DocumentMeta {
             document_id: document.id.to_string(),
             view_id: document.view_id.to_string(),
             owner: document.author.to_string()
         });
 
-        let futures = match document.fields {
+        let futures = match &document.fields {
             Some(fields) => fields
                 .iter()
                 .map(|(name, val)| self.build_field(name.clone(), val.clone()))
@@ -142,6 +157,36 @@ impl RpcServer {
 impl Connect for RpcServer {
     async fn get_collection(&self, request: Request<CollectionRequest>) -> Result<Response<CollectionResponse>> {
         let req = request.into_inner();
+        let schema_id = SchemaId::new(&req.schema_id)
+            .or_else(|e| Err(Status::invalid_argument(e.to_string())))?;
+        let query = req.into();
+        let schema = self.context.schema_provider
+            .get(&schema_id)
+            .await
+            .ok_or_else(|| "Schema not found")
+            .or_else(|e| Err(Status::invalid_argument(e)))?;
+
+        let (pagination_data, document_data) = self.context.store.query(&schema, &query, None)
+            .await
+            .or_else(|e| Err(Status::internal(e.to_string())))?;
+
+        let pagination = Some(PaginationData {
+            total_count: pagination_data.total_count.unwrap_or(0),
+            has_next_page: pagination_data.has_next_page,
+            has_previous_page: pagination_data.has_previous_page,
+            start_cursor: pagination_data.start_cursor.map(|c| c.into()),
+            end_cursor: pagination_data.end_cursor.map(|c| c.into()),
+        });
+
+        let futures = document_data
+            .iter()
+            .map(|(cur, doc)| self.get_document_cursor_tuple(cur, doc));
+        let documents = future::try_join_all(futures).await?;
+
+        Ok(Response::new(CollectionResponse {
+            documents,
+            pagination,
+        }))
     }
 
     async fn get_document(&self, request: Request<DocumentRequest>) -> Result<Response<DocumentResponse>> {
@@ -164,16 +209,16 @@ impl Connect for RpcServer {
         // TODO - preload all related documents from store - possibly leverage get_child_document_ids()?
         let document = self.get_document_from_store(document_id, document_view_id).await?;
         let doc_response = match document {
-            Some(document) => DocumentResponse { document: Some(self.build_document(document).await?) },
+            Some(document) => DocumentResponse { document: Some(self.build_document(&document).await?) },
             None => DocumentResponse { document: None },
         };
-        
+
         Ok(Response::new(doc_response))
     }
 
     async fn get_next_args(&self, request: Request<NextArgsRequest>) -> Result<Response<NextArgsResponse>> {
         let req = request.into_inner();
-        
+
         let public_key = PublicKey::new(&req.public_key)
             .or_else(|e| Err(Status::invalid_argument(e.to_string())))?;
 
@@ -183,7 +228,7 @@ impl Connect for RpcServer {
             ),
             None => None
         };
-        
+
         // Calculate next entry's arguments.
         let (backlink, skiplink, seq_num, log_id) = api::next_args(
             &self.context.store,
@@ -205,10 +250,10 @@ impl Connect for RpcServer {
 
     async fn do_publish(&self, request: Request<PublishRequest>) -> Result<Response<NextArgsResponse>> {
         let req = request.into_inner();
-        
+
         let entry_bytes = hex::decode(&req.entry).or_else(|e| Err(Status::invalid_argument(e.to_string())))?;
         let encoded_entry = EncodedEntry::from_bytes(&entry_bytes);
-        
+
         let op_bytes = hex::decode(&req.operation).or_else(|e| Err(Status::invalid_argument(e.to_string())))?;
         let encoded_operation = EncodedOperation::from_bytes(&op_bytes);
 
@@ -263,4 +308,3 @@ impl Connect for RpcServer {
         Ok(Response::new(next_args))
     }
 }
-
