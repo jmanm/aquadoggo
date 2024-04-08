@@ -23,6 +23,7 @@ mod manager;
 mod materializer;
 mod network;
 mod node;
+#[allow(unused_qualifications)]
 mod aquadoggo_rpc {
     tonic::include_proto!("rpc");
 }
