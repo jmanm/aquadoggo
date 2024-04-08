@@ -1,22 +1,29 @@
 use std::num::NonZeroU64;
 
-use crate::{aquadoggo_rpc::{self, CollectionRequest}, db::{query::{Filter, Order, Pagination, Select}, stores::{PaginationCursor, Query}}};
+use p2panda_rs::schema::Schema;
 
-impl From<CollectionRequest> for Query<PaginationCursor> {
-    fn from(value: CollectionRequest) -> Self {
+use crate::{aquadoggo_rpc::{self, CollectionRequest}, db::{query::{Field, Filter, Order, Pagination, Select}, stores::{PaginationCursor, Query}}};
+
+impl CollectionRequest {
+    pub fn to_query(&self, schema: &Schema) -> Query<PaginationCursor> {
         let mut pagination = Pagination::<PaginationCursor>::default();
         let mut order = Order::default();
         let mut filter = Filter::default();
-        let select = Select::all();
+        let mut select = Select::default();
 
-        if let Some(pag) = value.pagination {
+        if let Some(pag) = &self.pagination {
             pagination.first = NonZeroU64::new(pag.first).unwrap();
-            if let Some(after) = pag.after {
+            if let Some(after) = &pag.after {
 
             }
         }
 
-        Self {
+        for (field_name, _) in schema.fields().iter() {
+            let field = Field::Field(field_name.clone());
+            select.add(&field);
+        }
+
+        Query {
             pagination,
             order,
             filter,

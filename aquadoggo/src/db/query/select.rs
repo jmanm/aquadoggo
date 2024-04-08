@@ -12,22 +12,13 @@ pub type ApplicationFields = Vec<String>;
 /// A selection determines which fields get returned in the response.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Select {
-    all_fields: bool,
     pub fields: HashSet<Field>,
 }
 
 impl Select {
-    pub fn all() -> Self {
-        Self {
-            all_fields: true,
-            fields: HashSet::new(),
-        }
-    }
-
     /// Returns a new instance of selection settings.
     pub fn new(fields: &[Field]) -> Self {
         let mut select = Self {
-            all_fields: false,
             fields: HashSet::new(),
         };
 

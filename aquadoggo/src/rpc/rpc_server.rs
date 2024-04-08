@@ -20,7 +20,6 @@ use crate::context::Context;
 use crate::db::stores;
 use crate::db::types::StorageDocument;
 
-
 pub struct RpcServer {
     context: Context,
     tx: ServiceSender,
@@ -134,7 +133,7 @@ impl RpcServer {
         let meta = Some(DocumentMeta {
             document_id: document.id.to_string(),
             view_id: document.view_id.to_string(),
-            owner: document.author.to_string()
+            owner: document.author.to_string(),
         });
 
         let futures = match &document.fields {
@@ -159,12 +158,12 @@ impl Connect for RpcServer {
         let req = request.into_inner();
         let schema_id = SchemaId::new(&req.schema_id)
             .or_else(|e| Err(Status::invalid_argument(e.to_string())))?;
-        let query = req.into();
         let schema = self.context.schema_provider
             .get(&schema_id)
             .await
             .ok_or_else(|| "Schema not found")
             .or_else(|e| Err(Status::invalid_argument(e)))?;
+        let query = req.to_query(&schema);
 
         let (pagination_data, document_data) = self.context.store.query(&schema, &query, None)
             .await
