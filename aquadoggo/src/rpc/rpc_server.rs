@@ -163,7 +163,7 @@ impl Connect for RpcServer {
             .await
             .ok_or_else(|| "Schema not found")
             .or_else(|e| Err(Status::invalid_argument(e)))?;
-        let query = req.to_query(&schema);
+        let query = req.to_query(&schema)?;
 
         let (pagination_data, document_data) = self.context.store.query(&schema, &query, None)
             .await

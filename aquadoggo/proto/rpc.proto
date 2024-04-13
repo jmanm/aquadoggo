@@ -62,7 +62,21 @@ message FilterSetting {
     MetaField meta = 1;
     Field field = 2;
   }
-  bool exclusive = 3;
+  FilterOperator operator = 3;
+  // bool exclusive = 3;
+}
+
+enum FilterOperator {
+  In = 0;
+  NotIn = 1;
+  Eq = 2;
+  NotEq = 3;
+  Gt = 4;
+  Gte = 5;
+  Lt = 6;
+  Lte = 7;
+  Contains = 8;
+  NotContains = 9;
 }
 
 message CollectionResponse {
