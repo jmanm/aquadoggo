@@ -61,31 +61,26 @@ impl RpcServer {
         let field = match val.value() {
             OperationValue::Boolean(bool) => Field {
                 name,
-                data_type: 4,
                 value: Some(Value::BoolVal(bool.clone()))
             },
 
             OperationValue::Bytes(vec) => Field {
                 name,
-                data_type: 8,
                 value: Some(Value::ByteVal(vec.clone()))
             },
 
             OperationValue::Integer(int) => Field {
                 name,
-                data_type: 2,
                 value: Some(Value::IntVal(int.clone()))
             },
 
             OperationValue::Float(float) => Field {
                 name,
-                data_type: 3,
                 value: Some(Value::FloatVal(float.clone()))
             },
 
             OperationValue::String(string) => Field {
                 name,
-                data_type: 1,
                 value: Some(Value::StringVal(string.clone()))
             },
 
@@ -95,8 +90,7 @@ impl RpcServer {
                     .unwrap();
                 Field {
                     name,
-                    data_type: 0,
-                    value: Some(Value::DocVal(
+                    value: Some(Value::RelVal(
                         self.build_document(&related_doc).await?
                     ))
                 }
@@ -110,8 +104,7 @@ impl RpcServer {
                     .unwrap();
                 Field {
                     name,
-                    data_type: 0,
-                    value: Some(Value::DocVal(
+                    value: Some(Value::RelVal(
                         self.build_document(&related_doc).await?
                     ))
                 }
@@ -121,7 +114,6 @@ impl RpcServer {
 
             _ => Field {
                 name,
-                data_type: 0,
                 value: None
             }
         };

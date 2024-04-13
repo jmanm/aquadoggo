@@ -112,8 +112,8 @@ impl aquadoggo_rpc::Field {
                     aquadoggo_rpc::field::Value::FloatVal(f) => Ok(OperationValue::Float(f.clone())),
                     aquadoggo_rpc::field::Value::IntVal(i) => Ok(OperationValue::Integer(i.clone())),
                     aquadoggo_rpc::field::Value::StringVal(s) => Ok(OperationValue::String(s.clone())),
-                    aquadoggo_rpc::field::Value::DocVal(doc) => {
-                        if let Some(meta) = &doc.meta {
+                    aquadoggo_rpc::field::Value::RelVal(rel) => {
+                        if let Some(meta) = &rel.meta {
                             let doc_id = DocumentId::from_str(&meta.document_id)
                                 .or_else(|e| Err(Status::invalid_argument(e.to_string())))?;
                             return Ok(OperationValue::Relation(Relation::new(doc_id)));
