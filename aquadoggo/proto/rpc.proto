@@ -127,16 +127,23 @@ enum FieldType {
 }
 
 message Field {
-  FieldType data_type = 1;
-  string name = 2;
+  // FieldType data_type = 1;
+  string name = 1;
   oneof value {
-    Document doc_val = 3;
-    string string_val = 4;
-    sint64 int_val = 5;
-    double float_val = 6;
-    bool bool_val = 7;
-    bytes byte_val = 8;
+    Document rel_val = 2;
+    DocumentList rel_list_val = 3;
+    Document pinned_rel_val = 4;
+    DocumentList pinned_rel_list_val = 5;
+    string string_val = 6;
+    sint64 int_val = 7;
+    double float_val = 8;
+    bool bool_val = 9;
+    bytes byte_val = 10;
   }
+}
+
+message DocumentList {
+  repeated Document documents = 1;
 }
 
 message NextArgsRequest {
