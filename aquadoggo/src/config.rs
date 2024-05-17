@@ -38,6 +38,8 @@ pub struct Configuration {
     /// 2020.
     pub http_port: u16,
 
+    pub capnp_port: u16,
+
     /// Path to folder where blobs (binary files) are kept and served from.
     ///
     /// **Warning**: When set to a temporary directory, make sure that also the database itself is
@@ -62,6 +64,7 @@ impl Default for Configuration {
             database_url: "sqlite::memory:".into(),
             database_max_connections: 32,
             http_port: 2020,
+            capnp_port: 2023,
             blobs_base_path: PathBuf::new(),
             worker_pool_size: 16,
             network: NetworkConfiguration::default(),

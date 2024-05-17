@@ -24,6 +24,8 @@ const DEFAULT_HTTP_PORT: u16 = 2020;
 
 const DEFAULT_QUIC_PORT: u16 = 2022;
 
+const DEFAULT_CAPNP_PORT: u16 = 2023;
+
 const DEFAULT_WORKER_POOL_SIZE: u32 = 16;
 
 const DEFAULT_MDNS: bool = true;
@@ -44,6 +46,10 @@ fn default_http_port() -> u16 {
 
 fn default_quic_port() -> u16 {
     DEFAULT_QUIC_PORT
+}
+
+fn default_capnp_port() -> u16 {
+    DEFAULT_CAPNP_PORT
 }
 
 fn default_database_url() -> String {
@@ -116,6 +122,9 @@ pub struct ConfigFile {
     /// HTTP port for client-node communication, serving the GraphQL API. Defaults to 2020.
     #[serde(default = "default_http_port")]
     pub http_port: u16,
+
+    #[serde(default = "default_capnp_port")]
+    pub capnp_port: u16,
 
     /// QUIC port for node-node communication and data replication. Defaults to 2022.
     #[serde(default = "default_quic_port")]
@@ -220,6 +229,7 @@ impl Default for ConfigFile {
             database_url: default_database_url(),
             database_max_connections: default_max_database_connections(),
             http_port: default_http_port(),
+            capnp_port: default_capnp_port(),
             quic_port: default_quic_port(),
             blobs_base_path: None,
             mdns: default_mdns(),
@@ -293,6 +303,7 @@ impl TryFrom<ConfigFile> for Configuration {
             database_url: value.database_url,
             database_max_connections: value.database_max_connections,
             http_port: value.http_port,
+            capnp_port: value.capnp_port,
             blobs_base_path,
             worker_pool_size: value.worker_pool_size,
             network: NetworkConfiguration {

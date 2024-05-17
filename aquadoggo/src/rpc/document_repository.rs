@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use capnp_rpc::pry;
 use log::debug;
 use p2panda_rs::api::publish;
@@ -11,7 +13,16 @@ use capnp::{capability::Promise, Error};
 
 pub struct DocumentRepository {
     context: Context,
-    tx: ServiceSender,
+    tx: Arc<ServiceSender>,
+}
+
+impl DocumentRepository {
+    pub fn new(context: Context, tx: ServiceSender) -> Self {
+        Self {
+            context,
+            tx: Arc::new(tx),
+        }
+    }
 }
 
 impl document_repository::Server for DocumentRepository {
