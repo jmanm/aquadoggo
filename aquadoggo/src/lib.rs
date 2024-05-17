@@ -23,6 +23,10 @@ mod manager;
 mod materializer;
 mod network;
 mod node;
+mod aquadoggo_capnp {
+    include!(concat!(env!("OUT_DIR"), "/capnp/aquadoggo_capnp.rs"));
+}
+mod rpc;
 #[cfg(all(test, feature = "proptests"))]
 mod proptests;
 mod replication;
