@@ -3,12 +3,13 @@ use std::str::FromStr;
 
 use p2panda_rs::document::DocumentId;
 use p2panda_rs::operation::{OperationValue, Relation};
-use p2panda_rs::{document::DocumentViewId, schema::Schema};
+use p2panda_rs::schema::Schema;
 use tonic::{Result, Status};
 
-use crate::aquadoggo_rpc::{self, field, CollectionRequest};
-use crate::db::query::{self, Direction, Filter, MetaField, Order, Pagination, Select};
-use crate::db::stores::{OperationCursor, PaginationCursor, Query};
+use crate::aquadoggo_rpc::{self, CollectionRequest};
+use crate::db::query::{self, Direction, Field, Filter, MetaField, Order, Pagination, Select};
+use crate::db::query::Cursor;
+use crate::db::stores::{PaginationCursor, Query};
 
 impl CollectionRequest {
     pub fn to_query(&self, schema: &Schema) -> Result<Query<PaginationCursor>> {
@@ -17,46 +18,48 @@ impl CollectionRequest {
         let mut filter = Filter::default();
         let mut select = Select::default();
 
-        if  let Some(first) = &self.first {
-            pagination.first = NonZeroU64::new(first);
+        if  let Some(first) = self.first {
+            pagination.first = NonZeroU64::new(first).unwrap_or_else(|| NonZeroU64::MIN.saturating_add(200));
         }
 
         if let Some(after) = &self.after {
-            pagination.after = Some(PaginationCursor::decode(after));
+            let cursor = PaginationCursor::decode(after).or_else(|e| Err(Status::invalid_argument(e.to_string())))?;
+            pagination.after = Some(cursor);
         }
-        
+
         for (field_name, condition) in &self.filter {
-            let value = field.to_operation_value()?;
-            match filter_setting.operator() {
+            let value = condition.to_operation_value()?;
+            let field: &Field = &field_name.as_str().into();
+            match condition.operator() {
                 aquadoggo_rpc::FilterOperator::Contains => {
                     // filter.add_contains(&filter_field, value);
                 }
                 aquadoggo_rpc::FilterOperator::Eq => {
-                    filter.add(field_name.as_str().into(), &value);
+                    filter.add(field, &value);
                 }
                 aquadoggo_rpc::FilterOperator::Gt => {
-                    filter.add_gt(field_name.as_str().into(), &value);
+                    filter.add_gt(field, &value);
                 }
                 aquadoggo_rpc::FilterOperator::Gte => {
-                    filter.add_gte(field_name.as_str().into(), &value);
+                    filter.add_gte(field, &value);
                 }
                 aquadoggo_rpc::FilterOperator::In => {
                     // filter.add_in(&filter_field, values);
                 }
                 aquadoggo_rpc::FilterOperator::Lt => {
-                    filter.add_lt(field_name.as_str().into(), &value);
+                    filter.add_lt(field, &value);
                 }
                 aquadoggo_rpc::FilterOperator::Lte => {
-                    filter.add_lte(field_name.as_str().into(), &value);
+                    filter.add_lte(field, &value);
                 }
                 aquadoggo_rpc::FilterOperator::NotContains => {
-                    // filter.add_not_contains(field_name.as_str().into(), &value);
+                    // filter.add_not_contains(field, &value);
                 }
                 aquadoggo_rpc::FilterOperator::NotEq => {
-                    filter.add_not(field_name.as_str().into(), &value);
+                    filter.add_not(field, &value);
                 }
                 aquadoggo_rpc::FilterOperator::NotIn => {
-                    // filter.add_not_in(field_name.as_str().into(), values);
+                    // filter.add_not_in(field, values);
                 }
             }
         }
@@ -69,11 +72,10 @@ impl CollectionRequest {
                 field_name => query::Field::new(field_name),
             };
             order.field = Some(order_by);
-            
+
             let direction = match &self.order_direction() {
                 aquadoggo_rpc::Direction::Ascending => Direction::Ascending,
                 aquadoggo_rpc::Direction::Descending => Direction::Descending,
-                _ => Direction::Ascending
             };
             order.direction = direction;
         }
@@ -82,7 +84,7 @@ impl CollectionRequest {
         for (field_name, _) in schema.fields().iter() {
             if !has_selections || self.selections.contains_key(field_name) {
                 let field = query::Field::Field(field_name.clone());
-                select.add(&field);    
+                select.add(&field);
             }
         }
 
