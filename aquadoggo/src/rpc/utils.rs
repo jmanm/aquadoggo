@@ -28,35 +28,43 @@ impl CollectionRequest {
         }
 
         for (field_name, condition) in &self.filter {
-            let value = condition.to_operation_value()?;
+            let value = &condition.to_operation_value()?;
             let field: &Field = &field_name.as_str().into();
             match condition.operator() {
                 aquadoggo_rpc::FilterOperator::Contains => {
-                    // filter.add_contains(&filter_field, value);
+                    if let OperationValue::String(s) = value {
+                        filter.add_contains(field, s);
+                    } else {
+                        return Err(Status::invalid_argument("Contains filter can only be used for string fields"));
+                    }
                 }
                 aquadoggo_rpc::FilterOperator::Eq => {
-                    filter.add(field, &value);
+                    filter.add(field, value);
                 }
                 aquadoggo_rpc::FilterOperator::Gt => {
-                    filter.add_gt(field, &value);
+                    filter.add_gt(field, value);
                 }
                 aquadoggo_rpc::FilterOperator::Gte => {
-                    filter.add_gte(field, &value);
+                    filter.add_gte(field, value);
                 }
                 aquadoggo_rpc::FilterOperator::In => {
                     // filter.add_in(&filter_field, values);
                 }
                 aquadoggo_rpc::FilterOperator::Lt => {
-                    filter.add_lt(field, &value);
+                    filter.add_lt(field, value);
                 }
                 aquadoggo_rpc::FilterOperator::Lte => {
-                    filter.add_lte(field, &value);
+                    filter.add_lte(field, value);
                 }
                 aquadoggo_rpc::FilterOperator::NotContains => {
-                    // filter.add_not_contains(field, &value);
+                    if let OperationValue::String(s) = value {
+                        filter.add_not_contains(field, s);
+                    } else {
+                        return Err(Status::invalid_argument("Not-contains filter can only be used for string fields"));
+                    }
                 }
                 aquadoggo_rpc::FilterOperator::NotEq => {
-                    filter.add_not(field, &value);
+                    filter.add_not(field, value);
                 }
                 aquadoggo_rpc::FilterOperator::NotIn => {
                     // filter.add_not_in(field, values);
