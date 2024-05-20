@@ -13,11 +13,11 @@ use std::str::FromStr;
 use tonic::{Request, Response, Result, Status};
 
 use crate::aquadoggo_rpc::field::Value;
-use crate::aquadoggo_rpc::{CollectionRequest, CollectionResponse, Document, DocumentCursorTuple, DocumentMeta, DocumentRequest, DocumentResponse, Field, NextArgsRequest, NextArgsResponse, PaginationCursor, PaginationData, PublishRequest};
+use crate::aquadoggo_rpc::{CollectionRequest, CollectionResponse, Document, DocumentMeta, DocumentRequest, DocumentResponse, Field, NextArgsRequest, NextArgsResponse, PublishRequest};
 use crate::aquadoggo_rpc::connect_server::Connect;
 use crate::bus::{ServiceMessage, ServiceSender};
 use crate::context::Context;
-use crate::db::stores;
+use crate::db::stores::PaginationCursor;
 use crate::db::types::StorageDocument;
 
 pub struct RpcServer {
@@ -44,17 +44,10 @@ impl RpcServer {
         doc.or_else(|e| Err(Status::internal(e.to_string())))
     }
 
-    async fn get_document_cursor_tuple(&self, cur: &stores::PaginationCursor, doc: &StorageDocument) -> Result<DocumentCursorTuple> {
-        let cursor = PaginationCursor {
-            operation_cursor: cur.operation_cursor.to_string(),
-            root_operation_cursor: cur.root_operation_cursor.as_ref().map(|c| c.to_string()),
-            root_view_id: cur.root_view_id.as_ref().map(|id| id.to_string())
-        };
-        let document = self.build_document(doc).await?;
-        Ok(DocumentCursorTuple {
-            cursor: Some(cursor),
-            document: Some(document),
-        })
+    async fn get_document_with_cursor(&self, cur: &PaginationCursor, doc: &StorageDocument) -> Result<Document> {
+        let mut document = self.build_document(doc).await?;
+        document.cursor = Some(format!("{}", cur));
+        Ok(document)
     }
 
     async fn build_field(&self, name: String, val: DocumentViewValue) -> Result<Field> {
@@ -139,6 +132,7 @@ impl RpcServer {
 
         Ok(Document {
             meta,
+            cursor: None,
             fields
         })
     }
@@ -161,22 +155,16 @@ impl Connect for RpcServer {
             .await
             .or_else(|e| Err(Status::internal(e.to_string())))?;
 
-        let pagination = Some(PaginationData {
-            total_count: pagination_data.total_count.unwrap_or(0),
-            has_next_page: pagination_data.has_next_page,
-            has_previous_page: pagination_data.has_previous_page,
-            start_cursor: pagination_data.start_cursor.map(|c| c.into()),
-            end_cursor: pagination_data.end_cursor.map(|c| c.into()),
-        });
-
         let futures = document_data
             .iter()
-            .map(|(cur, doc)| self.get_document_cursor_tuple(cur, doc));
+            .map(|(cur, doc)| self.get_document_with_cursor(cur, doc));
         let documents = future::try_join_all(futures).await?;
 
         Ok(Response::new(CollectionResponse {
+            total_count: pagination_data.total_count.unwrap_or(0),
+            has_next_page: pagination_data.has_next_page,
+            end_cursor: pagination_data.end_cursor.map_or_else(|| String::new(), |c| c.to_string()),
             documents,
-            pagination,
         }))
     }
 
