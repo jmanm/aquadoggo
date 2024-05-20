@@ -11,45 +11,13 @@ service Connect {
 
 message CollectionRequest {
   string schema_id = 1;
-  optional Pagination pagination = 2;
-  optional Order order = 3;
-  repeated FilterSetting filter = 4;
-}
-
-message Pagination {
-  uint64 first = 1;
-  optional PaginationCursor after = 2;
-  repeated PaginationField fields = 3;
-}
-
-enum PaginationField {
-  TotalCount = 0;
-  HasNextPage = 1;
-  HasPreviousPage = 2;
-  StartCursor = 3;
-  EndCursor = 4;
-}
-
-message PaginationCursor {
-  string operation_cursor = 1;
-  optional string root_operation_cursor = 2;
-  optional string root_view_id = 3;
-}
-
-message Order {
-  oneof field {
-    MetaField meta = 1;
-    string field_name = 2;
-  }
-  Direction direction = 3;
-}
-
-enum MetaField {
-  DocumentId = 0;
-  DocumentViewId = 1;
-  Owner = 2;
-  Edited = 3;
-  Deleted = 4;
+  map<string, FilterCondition> filter = 2;
+  optional MetaFilter meta = 3;
+  optional string orderBy = 4;
+  optional Direction orderDirection = 5;
+  optional uint64 first = 6;
+  optional string after = 7;
+  map<string, bool> selections = 8;
 }
 
 enum Direction {
@@ -57,13 +25,27 @@ enum Direction {
   Descending = 1;
 }
 
-message FilterSetting {
-  oneof filter_by {
-    MetaField meta = 1;
-    Field field = 2;
+message MetaFilter {
+  optional string documentId = 1;
+  optional string viewId = 2;
+  optional string owner = 3;
+  optional bool edited = 4;
+  optional bool deleted = 5;
+}
+
+message FilterCondition {
+  FilterOperator operator = 1;
+  oneof value {
+    Document rel_val = 2;
+    DocumentList rel_list_val = 3;
+    Document pinned_rel_val = 4;
+    DocumentList pinned_rel_list_val = 5;
+    string string_val = 6;
+    sint64 int_val = 7;
+    double float_val = 8;
+    bool bool_val = 9;
+    bytes byte_val = 10;
   }
-  FilterOperator operator = 3;
-  // bool exclusive = 3;
 }
 
 enum FilterOperator {
@@ -80,26 +62,16 @@ enum FilterOperator {
 }
 
 message CollectionResponse {
-  PaginationData pagination = 1;
-  repeated DocumentCursorTuple documents = 2;
-}
-
-message DocumentCursorTuple {
-  PaginationCursor cursor = 1;
-  Document document = 2;
-}
-
-message PaginationData {
   uint64 total_count = 1;
   bool has_next_page = 2;
-  bool has_previous_page = 3;
-  optional PaginationCursor start_cursor = 4;
-  optional PaginationCursor end_cursor = 5;
+  string end_cursor = 3;
+  repeated Document documents = 4;
 }
 
 message DocumentRequest {
   optional string document_id = 1;
   optional string document_view_id = 2;
+  map<string, bool> selections = 3;
 }
 
 message DocumentResponse {
@@ -114,20 +86,11 @@ message DocumentMeta {
 
 message Document {
   DocumentMeta meta = 1;
-  repeated Field fields = 2;
-}
-
-enum FieldType {
-  Doc = 0;
-  String = 1;
-  Int = 2;
-  Float = 3;
-  Bool = 4;
-  Bytes = 5;
+  optional string cursor = 2;
+  repeated Field fields = 3;
 }
 
 message Field {
-  // FieldType data_type = 1;
   string name = 1;
   oneof value {
     Document rel_val = 2;
