@@ -27,6 +27,16 @@ impl CollectionRequest {
             pagination.after = Some(cursor);
         }
 
+        if let Some(meta_filter) = &self.meta {
+            if let Some(did) = &meta_filter.document_id {
+                let doc_id = DocumentId::from_str(did)
+                    .or_else(|e| Err(Status::invalid_argument(e.to_string())))?;
+                let value = OperationValue::Relation(Relation::new(doc_id));
+                let filter_field = Field::Meta(MetaField::DocumentId);
+                filter.add(&filter_field, &value);
+            }
+        }
+
         for (field_name, condition) in &self.filter {
             let value = &condition.to_operation_value()?;
             let field: &Field = &field_name.as_str().into();
