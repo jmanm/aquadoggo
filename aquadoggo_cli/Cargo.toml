@@ -12,7 +12,7 @@ authors = [
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/p2panda/aquadoggo"
 readme = "README.md"
-edition = "2018"
+edition = "2021"
 
 [[bin]]
 name = "aquadoggo"

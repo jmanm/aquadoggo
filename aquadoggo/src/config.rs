@@ -38,6 +38,7 @@ pub struct Configuration {
     /// 2020.
     pub http_port: u16,
 
+    /// HTTP port for the gRPC API. Defaults to 2021.
     pub grpc_port: u16,
 
     /// Path to folder where blobs (binary files) are kept and served from.

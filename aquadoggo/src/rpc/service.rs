@@ -8,7 +8,7 @@ use crate::{aquadoggo_rpc::connect_server::ConnectServer, bus::ServiceSender, co
 
 use super::rpc_server::RpcServer;
 
-pub async fn rpc_service(
+pub async fn grpc_service(
     context: Context,
     signal: Shutdown,
     tx: ServiceSender,
