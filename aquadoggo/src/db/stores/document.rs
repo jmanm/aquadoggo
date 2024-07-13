@@ -170,8 +170,12 @@ impl DocumentStore for SqlStore {
         .await
         .map_err(|e| DocumentStorageError::FatalStorageError(e.to_string()))?;
 
-        // Unwrap as we can assume a document for the found document id exists.
-        let document_row = document_row.unwrap();
+        // If no row matched we return None here, otherwise unwrap safely
+        let document_row = match document_row {
+            Some(document_row) => document_row,
+            // Document might have already been deleted
+            None => return Ok(None),
+        };
 
         // We now want to retrieve the view (current key-value map) for this document, as we
         // already filtered out deleted documents in the query above we can expect all documents
@@ -220,7 +224,7 @@ impl DocumentStore for SqlStore {
                 ON
                     operations_v1.operation_id = documents.document_id
             WHERE
-                documents.schema_id = $1  AND documents.is_deleted = false
+                documents.schema_id = $1 AND documents.is_deleted = false
             ",
         )
         .bind(schema_id.to_string())
@@ -404,7 +408,9 @@ impl SqlStore {
         document_view_id: &DocumentViewId,
     ) -> Result<Vec<DocumentId>, DocumentStorageError> {
         // Collect all ids or view ids of children related to from the passed document view.
-        let children_ids: Vec<String> = query_scalar(
+        //
+        // Value is None when a relation list is empty.
+        let children_ids: Vec<Option<String>> = query_scalar(
             "
             SELECT
                 operation_fields_v1.value
@@ -418,9 +424,9 @@ impl SqlStore {
                 document_view_fields.name = operation_fields_v1.name
             WHERE
                 operation_fields_v1.field_type IN (
-                    'pinned_relation', 
-                    'pinned_relation_list', 
-                    'relation', 
+                    'pinned_relation',
+                    'pinned_relation_list',
+                    'relation',
                     'relation_list'
                 )
             AND
@@ -431,6 +437,9 @@ impl SqlStore {
         .fetch_all(&self.pool)
         .await
         .map_err(|err| DocumentStorageError::FatalStorageError(err.to_string()))?;
+
+        // Remove any None results from the vec.
+        let children_ids: Vec<String> = children_ids.into_iter().flatten().collect();
 
         // If no children were found return now already with an empty vec.
         if children_ids.is_empty() {
@@ -534,11 +543,11 @@ impl SqlStore {
     ) -> Result<bool, DocumentStorageError> {
         let document_view_id: Option<String> = query_scalar(
             "
-            SELECT 
-                documents.document_view_id 
-            FROM 
+            SELECT
+                documents.document_view_id
+            FROM
                 documents
-            WHERE 
+            WHERE
                 documents.document_view_id = $1
             ",
         )
@@ -814,7 +823,7 @@ mod tests {
         test_runner(|node: TestNode| async move {
             // Populate the store with some entries and operations but DON'T materialise any resulting documents.
             let documents = populate_store(&node.context.store, &config).await;
-            let document = documents.get(0).expect("At least one document");
+            let document = documents.first().expect("At least one document");
 
             // Get the operations and build the document.
             let operations = node
@@ -959,7 +968,7 @@ mod tests {
             // Populate the store with some entries and operations but DON'T materialise any
             // resulting documents.
             let documents = populate_store(&node.context.store, &config).await;
-            let document = documents.get(0).expect("At least one document");
+            let document = documents.first().expect("At least one document");
 
             // The document is successfully inserted into the database, this relies on the
             // operations already being present and would fail if they were not.
@@ -1017,7 +1026,7 @@ mod tests {
             // Populate the store with some entries and operations but DON'T materialise any
             // resulting documents.
             let documents = populate_store(&node.context.store, &config).await;
-            let document = documents.get(0).expect("At least one document");
+            let document = documents.first().expect("At least one document");
 
             // Get the view id.
             let view_id = document.view_id();
@@ -1060,7 +1069,7 @@ mod tests {
         test_runner(|node: TestNode| async move {
             // Populate the store with some entries and operations but DON'T materialise any resulting documents.
             let documents = populate_store(&node.context.store, &config).await;
-            let document = documents.get(0).expect("At least one document");
+            let document = documents.first().expect("At least one document");
 
             // Insert the document, this is possible even though it has been deleted.
             let result = node.context.store.insert_document(document).await;
@@ -1086,7 +1095,7 @@ mod tests {
         test_runner(|node: TestNode| async move {
             // Populate the store with some entries and operations but DON'T materialise any resulting documents.
             let documents = populate_store(&node.context.store, &config).await;
-            let document = documents.get(0).expect("At least one document");
+            let document = documents.first().expect("At least one document");
 
             // Get the operations for this document and sort them into linear order.
             let operations = node
@@ -1429,6 +1438,28 @@ mod tests {
             assert!(result.is_ok());
             let next_args = result.unwrap();
             assert_eq!(next_args, (None, None, SeqNum::default(), LogId::new(1)));
+        });
+    }
+
+    #[rstest]
+    fn regression_handle_null_relation_list_value(
+        #[from(populate_store_config)]
+        #[with(1, 1, vec![KeyPair::new()])]
+        config: PopulateStoreConfig,
+    ) {
+        test_runner(|mut node: TestNode| async move {
+            // Populate the store and materialize all documents.
+            let documents = populate_and_materialize(&mut node, &config).await;
+            let document = documents[0].clone();
+
+            // The default test document contains an empty pinned relation list field.
+            let result = node
+                .context
+                .store
+                .get_child_document_ids(&document.view_id())
+                .await;
+
+            assert!(result.is_ok());
         });
     }
 }

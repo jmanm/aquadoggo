@@ -7,6 +7,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Expose NodeEvent to public API [#643](https://github.com/p2panda/aquadoggo/pull/643)
+
+## [0.8.0]
+
+### Added
+
+- Node API to subscribe to peer connection events [#625](https://github.com/p2panda/aquadoggo/pull/625)
+- Support private network secured by pre-shared key [#635](https://github.com/p2panda/aquadoggo/pull/635)
+
+### Changed
+
+- Update `libp2p` to version `0.53.2` and apply API changes [#631](https://github.com/p2panda/aquadoggo/pull/631)
+- Move relay registration into main network service event loop [#632](https://github.com/p2panda/aquadoggo/pull/632)
+- Adjust level of replication and materialization logs [#639](https://github.com/p2panda/aquadoggo/pull/639)
+
+### Fixed
+
+- Handle connection ids greater than 9 in `Peer` impl of `Human` trait [#634](https://github.com/p2panda/aquadoggo/pull/634)
+- Check if blob file exists before deleting it from fs [#636](https://github.com/p2panda/aquadoggo/pull/636)
+- Inconsistent blob storage warning was wrongly shown [#638](https://github.com/p2panda/aquadoggo/pull/638)
+- Safely handle missing document when retrieving document view from store [#637](https://github.com/p2panda/aquadoggo/pull/637)
+
+## [0.7.4]
+
+### Added
+
+- Introduce `PeerAddress` struct to help resolve `String` to internal address types [#621](https://github.com/p2panda/aquadoggo/pull/621)
+- Re-dial all configured known peers on schedule [#622](https://github.com/p2panda/aquadoggo/pull/622)
+
+### Changed
+
+- Increase `max_pending_connections_in` and `max_pending_connections_out` [#628](https://github.com/p2panda/aquadoggo/pull/628)
+
+### Fixed
+
+- Re-materialize blobs which were only partially written to disc due to node crash [#618](https://github.com/p2panda/aquadoggo/pull/618)
+- Include all logs for target schemas during replication [#620](https://github.com/p2panda/aquadoggo/pull/620)
+- Re-apply unhandled operations during startup of materializer service [#623](https://github.com/p2panda/aquadoggo/pull/623)
+
+## [0.7.3]
+
+### Fixed
+
+- Handle null values returned from empty child relation queries [#614](https://github.com/p2panda/aquadoggo/pull/614)
+
+## [0.7.2]
+
+### Changed
+
+- Accept domain name and ip addresses for peers in configuration file and cli [#612](https://github.com/p2panda/aquadoggo/pull/612)
+- Allow setting config file path via environment variables [#611](https://github.com/p2panda/aquadoggo/pull/611)
+
 ## [0.7.1]
 
 ### Added
@@ -283,7 +337,11 @@ Released on 2021-10-25: :package: [`crate`](https://crates.io/crates/aquadoggo/0
 - Use p2panda-rs 0.2.1 with fixed linter setting [#41](https://github.com/p2panda/aquadoggo/41)
 - Use `tide` for HTTP server and `jsonrpc-v2` for JSON RPC [#29](https://github.com/p2panda/aquadoggo/29)
 
-[unreleased]: https://github.com/p2panda/aquadoggo/compare/v0.7.1...HEAD
+[unreleased]: https://github.com/p2panda/aquadoggo/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/p2panda/aquadoggo/releases/tag/v0.8.0
+[0.7.4]: https://github.com/p2panda/aquadoggo/releases/tag/v0.7.4
+[0.7.3]: https://github.com/p2panda/aquadoggo/releases/tag/v0.7.3
+[0.7.2]: https://github.com/p2panda/aquadoggo/releases/tag/v0.7.2
 [0.7.1]: https://github.com/p2panda/aquadoggo/releases/tag/v0.7.1
 [0.7.0]: https://github.com/p2panda/aquadoggo/releases/tag/v0.7.0
 [0.6.0]: https://github.com/p2panda/aquadoggo/releases/tag/v0.6.0
