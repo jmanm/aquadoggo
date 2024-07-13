@@ -227,7 +227,7 @@ fn group_and_parse_operation_rows(
             // If we've moved on to the next operation, then push the complete vec of operation
             // rows to the grouped rows collection and then setup for the next iteration.
             grouped_operation_rows.push(current_operation_rows.clone());
-            current_operation_id = row.operation_id.clone();
+            current_operation_id.clone_from(&row.operation_id);
             current_operation_rows = vec![row];
         }
     }
@@ -243,6 +243,30 @@ fn group_and_parse_operation_rows(
 }
 
 impl SqlStore {
+    /// Returns ids of operations which have not been processed by `reduce` task yet.
+    pub async fn get_unindexed_operation_ids(
+        &self,
+    ) -> Result<Vec<OperationId>, OperationStorageError> {
+        let id_rows: Vec<String> = query_scalar(
+            "
+            SELECT
+                operations_v1.operation_id
+            FROM
+                operations_v1
+            WHERE
+                operations_v1.sorted_index IS NULL
+            ",
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| OperationStorageError::FatalStorageError(e.to_string()))?;
+
+        Ok(id_rows
+            .iter()
+            .map(|id| id.parse().expect("invalid operation id in database"))
+            .collect())
+    }
+
     /// Update the sorted index of an operation. This method is used in `reduce` tasks as each
     /// operation is processed.
     pub async fn update_operation_index(
@@ -588,7 +612,7 @@ mod tests {
         test_runner(|mut node: TestNode| async move {
             // Populate the store with some entries and operations and materialize documents.
             let documents = populate_and_materialize(&mut node, &config).await;
-            let document_id = documents.get(0).expect("At least one document id").id();
+            let document_id = documents.first().expect("At least one document id").id();
 
             let operations_by_document_id = node
                 .context
