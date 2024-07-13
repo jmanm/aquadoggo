@@ -122,6 +122,7 @@ pub struct ConfigFile {
     #[serde(default = "default_http_port")]
     pub http_port: u16,
 
+    /// HTTP port for the gRPC API. Defaults to 2021.
     #[serde(default = "default_grpc_port")]
     pub grpc_port: u16,
 

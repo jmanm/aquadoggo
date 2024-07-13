@@ -3,6 +3,7 @@ members = [
   "aquadoggo",
   "aquadoggo_cli",
 ]
+resolver = "2"
 
 [profile.release]
 strip = true
