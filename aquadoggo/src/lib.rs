@@ -27,7 +27,7 @@ mod node;
 mod aquadoggo_rpc {
     tonic::include_proto!("rpc");
 }
-mod rpc;
+mod grpc;
 #[cfg(all(test, feature = "proptests"))]
 mod proptests;
 mod replication;
