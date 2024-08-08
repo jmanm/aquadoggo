@@ -25,14 +25,14 @@ impl CollectionRequest {
 
         if let Some(after) = &self.after {
             let cursor = PaginationCursor::decode(after)
-                .or_else(|e| Err(Status::invalid_argument(e.to_string())))?;
+                .map_err(|e| Status::invalid_argument(e.to_string()))?;
             pagination.after = Some(cursor);
         }
 
         if let Some(meta_filter) = &self.meta {
             if let Some(did) = &meta_filter.document_id {
                 let doc_id = DocumentId::from_str(did)
-                    .or_else(|e| Err(Status::invalid_argument(e.to_string())))?;
+                    .map_err(|e| Status::invalid_argument(e.to_string()))?;
                 let value = OperationValue::Relation(Relation::new(doc_id));
                 let filter_field = Field::Meta(MetaField::DocumentId);
                 filter.add(&filter_field, &value);
@@ -104,7 +104,7 @@ impl CollectionRequest {
             order.direction = direction;
         }
 
-        let has_selections = self.selections.len() > 0;
+        let has_selections = !self.selections.is_empty();
         for (field_name, _) in schema.fields().iter() {
             if !has_selections || self.selections.contains_key(field_name) {
                 let field = query::Field::Field(field_name.clone());
@@ -126,16 +126,16 @@ impl aquadoggo_rpc::FilterCondition {
         match &self.value {
             Some(val) => match val {
                 aquadoggo_rpc::filter_condition::Value::BoolVal(b) => {
-                    Ok(OperationValue::Boolean(b.clone()))
+                    Ok(OperationValue::Boolean(*b))
                 }
                 aquadoggo_rpc::filter_condition::Value::ByteVal(b) => {
                     Ok(OperationValue::Bytes(b.clone()))
                 }
                 aquadoggo_rpc::filter_condition::Value::FloatVal(f) => {
-                    Ok(OperationValue::Float(f.clone()))
+                    Ok(OperationValue::Float(*f))
                 }
                 aquadoggo_rpc::filter_condition::Value::IntVal(i) => {
-                    Ok(OperationValue::Integer(i.clone()))
+                    Ok(OperationValue::Integer(*i))
                 }
                 aquadoggo_rpc::filter_condition::Value::StringVal(s) => {
                     Ok(OperationValue::String(s.clone()))
@@ -143,7 +143,7 @@ impl aquadoggo_rpc::FilterCondition {
                 aquadoggo_rpc::filter_condition::Value::RelVal(rel) => {
                     if let Some(meta) = &rel.meta {
                         let doc_id = DocumentId::from_str(&meta.document_id)
-                            .or_else(|e| Err(Status::invalid_argument(e.to_string())))?;
+                            .map_err(|e| Status::invalid_argument(e.to_string()))?;
                         return Ok(OperationValue::Relation(Relation::new(doc_id)));
                     }
                     Err(Status::invalid_argument("No document id provided"))
