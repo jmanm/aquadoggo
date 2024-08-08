@@ -88,7 +88,7 @@ impl Node {
 
         // Start gPRC server
         if manager.add("grpc", grpc_service).await.is_err() {
-            panic!("Failed starting  gRPC service");
+            panic!("Failed starting gRPC service");
         }
 
         // Start network service
