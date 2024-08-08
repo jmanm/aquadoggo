@@ -44,18 +44,18 @@ impl GrpcServer {
             (None, Some(document_view_id)) => {
                 self.context
                     .store
-                    .get_document_by_view_id(&DocumentViewId::from(document_view_id.to_owned()))
+                    .get_document_by_view_id(&document_view_id)
                     .await
             }
             (Some(document_id), None) => {
                 self.context
                     .store
-                    .get_document(&DocumentId::from(document_id))
+                    .get_document(&document_id)
                     .await
             }
             _ => panic!("Invalid values passed from query field parent"),
         };
-        doc.or_else(|e| Err(Status::internal(e.to_string())))
+        doc.map_err(|e| Status::internal(e.to_string()))
     }
 
     async fn get_document_with_cursor(
@@ -72,7 +72,7 @@ impl GrpcServer {
         let field = match val.value() {
             OperationValue::Boolean(bool) => Field {
                 name,
-                value: Some(Value::BoolVal(bool.clone())),
+                value: Some(Value::BoolVal(*bool)),
             },
 
             OperationValue::Bytes(vec) => Field {
@@ -82,12 +82,12 @@ impl GrpcServer {
 
             OperationValue::Integer(int) => Field {
                 name,
-                value: Some(Value::IntVal(int.clone())),
+                value: Some(Value::IntVal(*int)),
             },
 
             OperationValue::Float(float) => Field {
                 name,
-                value: Some(Value::FloatVal(float.clone())),
+                value: Some(Value::FloatVal(*float)),
             },
 
             OperationValue::String(string) => Field {
@@ -157,14 +157,14 @@ impl Connect for GrpcServer {
     ) -> Result<Response<CollectionResponse>> {
         let req = request.into_inner();
         let schema_id = SchemaId::new(&req.schema_id)
-            .or_else(|e| Err(Status::invalid_argument(e.to_string())))?;
+            .map_err(|e| Status::invalid_argument(e.to_string()))?;
         let schema = self
             .context
             .schema_provider
             .get(&schema_id)
             .await
-            .ok_or_else(|| "Schema not found")
-            .or_else(|e| Err(Status::invalid_argument(e)))?;
+            .ok_or("Schema not found")
+            .map_err(Status::invalid_argument)?;
         let query = req.to_query(&schema)?;
 
         let (pagination_data, document_data) = self
@@ -172,7 +172,7 @@ impl Connect for GrpcServer {
             .store
             .query(&schema, &query, None)
             .await
-            .or_else(|e| Err(Status::internal(e.to_string())))?;
+            .map_err(|e| Status::internal(e.to_string()))?;
 
         let futures = document_data
             .iter()
@@ -184,7 +184,7 @@ impl Connect for GrpcServer {
             has_next_page: pagination_data.has_next_page,
             end_cursor: pagination_data
                 .end_cursor
-                .map_or_else(|| String::new(), |c| c.to_string()),
+                .map_or_else(String::new, |c| c.to_string()),
             documents,
         }))
     }
@@ -197,7 +197,7 @@ impl Connect for GrpcServer {
         let document_id = match req.document_id {
             Some(id) => {
                 let doc_id = DocumentId::from_str(&id)
-                    .or_else(|e| Err(Status::invalid_argument(e.to_string())))?;
+                    .map_err(|e| Status::invalid_argument(e.to_string()))?;
                 Some(doc_id)
             }
             None => None,
@@ -205,7 +205,7 @@ impl Connect for GrpcServer {
         let document_view_id = match req.document_view_id {
             Some(id) => {
                 let view_id = DocumentViewId::from_str(&id)
-                    .or_else(|e| Err(Status::invalid_argument(e.to_string())))?;
+                    .map_err(|e| Status::invalid_argument(e.to_string()))?;
                 Some(view_id)
             }
             None => None,
@@ -232,12 +232,12 @@ impl Connect for GrpcServer {
         let req = request.into_inner();
 
         let public_key = PublicKey::new(&req.public_key)
-            .or_else(|e| Err(Status::invalid_argument(e.to_string())))?;
+            .map_err(|e| Status::invalid_argument(e.to_string()))?;
 
         let document_view_id = match req.document_view_id {
             Some(id) => Some(
                 DocumentViewId::from_str(&id)
-                    .or_else(|e| Err(Status::invalid_argument(e.to_string())))?,
+                    .map_err(|e| Status::invalid_argument(e.to_string()))?,
             ),
             None => None,
         };
@@ -246,10 +246,10 @@ impl Connect for GrpcServer {
         let (backlink, skiplink, seq_num, log_id) = api::next_args(
             &self.context.store,
             &public_key,
-            document_view_id.map(|id| id.into()).as_ref(),
+            document_view_id.as_ref(),
         )
         .await
-        .or_else(|e| Err(Status::internal(e.to_string())))?;
+        .map_err(|e| Status::internal(e.to_string()))?;
 
         // Construct and return the next args.
         let next_args = NextArgsResponse {
@@ -268,11 +268,11 @@ impl Connect for GrpcServer {
         let req = request.into_inner();
 
         let entry_bytes =
-            hex::decode(&req.entry).or_else(|e| Err(Status::invalid_argument(e.to_string())))?;
+            hex::decode(&req.entry).map_err(|e| Status::invalid_argument(e.to_string()))?;
         let encoded_entry = EncodedEntry::from_bytes(&entry_bytes);
 
         let op_bytes = hex::decode(&req.operation)
-            .or_else(|e| Err(Status::invalid_argument(e.to_string())))?;
+            .map_err(|e| Status::invalid_argument(e.to_string()))?;
         let encoded_operation = EncodedOperation::from_bytes(&op_bytes);
 
         debug!(
@@ -281,15 +281,15 @@ impl Connect for GrpcServer {
         );
 
         let operation = decode_operation(&encoded_operation)
-            .or_else(|e| Err(Status::invalid_argument(e.to_string())))?;
+            .map_err(|e| Status::invalid_argument(e.to_string()))?;
 
         let schema = self
             .context
             .schema_provider
             .get(operation.schema_id())
             .await
-            .ok_or_else(|| "Schema not found")
-            .or_else(|e| Err(Status::invalid_argument(e)))?;
+            .ok_or("Schema not found")
+            .map_err(Status::invalid_argument)?;
 
         /////////////////////////////////////
         // PUBLISH THE ENTRY AND OPERATION //
@@ -303,7 +303,7 @@ impl Connect for GrpcServer {
             &encoded_operation,
         )
         .await
-        .or_else(|e| Err(Status::internal(e.to_string())))?;
+        .map_err(|e| Status::internal(e.to_string()))?;
 
         ////////////////////////////////////////
         // SEND THE OPERATION TO MATERIALIZER //
