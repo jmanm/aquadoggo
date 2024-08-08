@@ -7,8 +7,8 @@ use p2panda_rs::schema::Schema;
 use tonic::{Result, Status};
 
 use crate::aquadoggo_rpc::{self, CollectionRequest};
-use crate::db::query::{self, Direction, Field, Filter, MetaField, Order, Pagination, Select};
 use crate::db::query::Cursor;
+use crate::db::query::{self, Direction, Field, Filter, MetaField, Order, Pagination, Select};
 use crate::db::stores::{PaginationCursor, Query};
 
 impl CollectionRequest {
@@ -18,12 +18,14 @@ impl CollectionRequest {
         let mut filter = Filter::default();
         let mut select = Select::default();
 
-        if  let Some(first) = self.first {
-            pagination.first = NonZeroU64::new(first).unwrap_or_else(|| NonZeroU64::MIN.saturating_add(200));
+        if let Some(first) = self.first {
+            pagination.first =
+                NonZeroU64::new(first).unwrap_or_else(|| NonZeroU64::MIN.saturating_add(200));
         }
 
         if let Some(after) = &self.after {
-            let cursor = PaginationCursor::decode(after).or_else(|e| Err(Status::invalid_argument(e.to_string())))?;
+            let cursor = PaginationCursor::decode(after)
+                .or_else(|e| Err(Status::invalid_argument(e.to_string())))?;
             pagination.after = Some(cursor);
         }
 
@@ -45,7 +47,9 @@ impl CollectionRequest {
                     if let OperationValue::String(s) = value {
                         filter.add_contains(field, s);
                     } else {
-                        return Err(Status::invalid_argument("Contains filter can only be used for string fields"));
+                        return Err(Status::invalid_argument(
+                            "Contains filter can only be used for string fields",
+                        ));
                     }
                 }
                 aquadoggo_rpc::FilterOperator::Eq => {
@@ -70,7 +74,9 @@ impl CollectionRequest {
                     if let OperationValue::String(s) = value {
                         filter.add_not_contains(field, s);
                     } else {
-                        return Err(Status::invalid_argument("Not-contains filter can only be used for string fields"));
+                        return Err(Status::invalid_argument(
+                            "Not-contains filter can only be used for string fields",
+                        ));
                     }
                 }
                 aquadoggo_rpc::FilterOperator::NotEq => {
@@ -118,25 +124,33 @@ impl CollectionRequest {
 impl aquadoggo_rpc::FilterCondition {
     fn to_operation_value(&self) -> Result<OperationValue> {
         match &self.value {
-            Some(val) => {
-                match val {
-                    aquadoggo_rpc::filter_condition::Value::BoolVal(b) => Ok(OperationValue::Boolean(b.clone())),
-                    aquadoggo_rpc::filter_condition::Value::ByteVal(b) => Ok(OperationValue::Bytes(b.clone())),
-                    aquadoggo_rpc::filter_condition::Value::FloatVal(f) => Ok(OperationValue::Float(f.clone())),
-                    aquadoggo_rpc::filter_condition::Value::IntVal(i) => Ok(OperationValue::Integer(i.clone())),
-                    aquadoggo_rpc::filter_condition::Value::StringVal(s) => Ok(OperationValue::String(s.clone())),
-                    aquadoggo_rpc::filter_condition::Value::RelVal(rel) => {
-                        if let Some(meta) = &rel.meta {
-                            let doc_id = DocumentId::from_str(&meta.document_id)
-                                .or_else(|e| Err(Status::invalid_argument(e.to_string())))?;
-                            return Ok(OperationValue::Relation(Relation::new(doc_id)));
-                        }
-                        Err(Status::invalid_argument("No document id provided"))
-                    }
-                    _ => Err(Status::invalid_argument("Unsupported"))
+            Some(val) => match val {
+                aquadoggo_rpc::filter_condition::Value::BoolVal(b) => {
+                    Ok(OperationValue::Boolean(b.clone()))
                 }
-            }
-            None => Err(Status::invalid_argument("No value provided"))
+                aquadoggo_rpc::filter_condition::Value::ByteVal(b) => {
+                    Ok(OperationValue::Bytes(b.clone()))
+                }
+                aquadoggo_rpc::filter_condition::Value::FloatVal(f) => {
+                    Ok(OperationValue::Float(f.clone()))
+                }
+                aquadoggo_rpc::filter_condition::Value::IntVal(i) => {
+                    Ok(OperationValue::Integer(i.clone()))
+                }
+                aquadoggo_rpc::filter_condition::Value::StringVal(s) => {
+                    Ok(OperationValue::String(s.clone()))
+                }
+                aquadoggo_rpc::filter_condition::Value::RelVal(rel) => {
+                    if let Some(meta) = &rel.meta {
+                        let doc_id = DocumentId::from_str(&meta.document_id)
+                            .or_else(|e| Err(Status::invalid_argument(e.to_string())))?;
+                        return Ok(OperationValue::Relation(Relation::new(doc_id)));
+                    }
+                    Err(Status::invalid_argument("No document id provided"))
+                }
+                _ => Err(Status::invalid_argument("Unsupported")),
+            },
+            None => Err(Status::invalid_argument("No value provided")),
         }
     }
 }

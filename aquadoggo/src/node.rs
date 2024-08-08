@@ -10,12 +10,12 @@ use crate::config::Configuration;
 use crate::context::Context;
 use crate::db::SqlStore;
 use crate::db::{connection_pool, create_database, run_pending_migrations, Pool};
+use crate::grpc::service::grpc_service;
 use crate::http::http_service;
 use crate::manager::ServiceManager;
 use crate::materializer::materializer_service;
 use crate::network::network_service;
 use crate::replication::replication_service;
-use crate::rpc::service::grpc_service;
 use crate::schema::SchemaProvider;
 use crate::LockFile;
 
