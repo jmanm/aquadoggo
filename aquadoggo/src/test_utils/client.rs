@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 use std::convert::TryFrom;
-use std::net::{SocketAddr, TcpListener};
+use std::net::{Ipv4Addr, SocketAddr, TcpListener};
 use std::time::Duration;
 
 use axum::body::HttpBody;
@@ -16,6 +16,9 @@ use tower_service::Service;
 use crate::graphql::GraphQLSchemaManager;
 use crate::http::{build_server, HttpServiceContext};
 use crate::test_utils::TestNode;
+use crate::aquadoggo_rpc::connect_client::ConnectClient;
+use crate::aquadoggo_rpc::connect_server::ConnectServer;
+use crate::grpc::grpc_server::GrpcServer;
 
 /// HTTP client for testing request and responses.
 pub struct TestClient {
@@ -84,6 +87,24 @@ pub async fn http_test_client(node: &TestNode) -> TestClient {
     );
 
     TestClient::new(build_server(http_context))
+}
+
+pub async fn grpc_test_client(node: &TestNode) -> ConnectClient<tonic::transport::Channel> {
+    let (tx, _) = broadcast::channel(120);
+    let addr = SocketAddr::new(std::net::IpAddr::V4(Ipv4Addr::LOCALHOST), 2021);
+    let url = format!("http://{}", addr);
+
+    let handler = GrpcServer::new(node.context.clone(), tx);
+
+    tokio::spawn(async move {
+        tonic::transport::Server::builder()
+            .add_service(ConnectServer::new(handler))
+            .serve(addr)
+            .await
+            .expect("gRPC server error");
+    });
+
+    ConnectClient::connect(url).await.expect("Unable to create channel")
 }
 
 pub(crate) struct RequestBuilder {
