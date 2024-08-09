@@ -2,7 +2,8 @@ use std::collections::HashMap;
 
 use p2panda_rs::{schema::FieldType, test_utils::fixtures::random_key_pair};
 
-use crate::{aquadoggo_rpc::{connect_client::ConnectClient, field::Value, DocumentRequest}, test_utils::{add_document, add_schema, test_runner, TestNode}};
+use crate::aquadoggo_rpc::{field::Value, DocumentRequest};
+use crate::test_utils::{add_document, add_schema, grpc_test_client, test_runner, TestNode};
 
 #[test]
 fn scalar_fields() {
@@ -34,11 +35,11 @@ fn scalar_fields() {
         ];
         let view_id = add_document(&mut node, schema.id(), doc_fields.clone(), &key_pair).await;
 
-        let mut client = ConnectClient::connect("http://localhost:2021").await.unwrap();
+        let mut grpc_client = grpc_test_client(&node).await;
         let mut request = DocumentRequest::default();
         request.document_view_id = Some(view_id.to_string());
 
-        let response = client.get_document(request)
+        let response = grpc_client.get_document(request)
             .await
             .unwrap()
             .into_inner();
