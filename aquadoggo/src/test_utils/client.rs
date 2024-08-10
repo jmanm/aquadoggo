@@ -1,16 +1,23 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 use std::convert::TryFrom;
-use std::net::{Ipv4Addr, SocketAddr, TcpListener};
+use std::net::{SocketAddr, TcpListener};
+use std::sync::Arc;
 use std::time::Duration;
 
 use axum::body::HttpBody;
 use axum::BoxError;
 use http::header::{HeaderName, HeaderValue};
-use http::{HeaderMap, Request, StatusCode};
+use http::{HeaderMap, Request, StatusCode, Uri};
 use hyper::{Body, Server};
+use tempfile::NamedTempFile;
+use tokio::net::{UnixListener, UnixStream};
 use tokio::sync::broadcast;
+use tokio::task::JoinHandle;
+use tokio_stream::wrappers::UnixListenerStream;
+use tonic::transport::Endpoint;
 use tower::make::Shared;
+use tower::service_fn;
 use tower_service::Service;
 
 use crate::graphql::GraphQLSchemaManager;
@@ -89,22 +96,39 @@ pub async fn http_test_client(node: &TestNode) -> TestClient {
     TestClient::new(build_server(http_context))
 }
 
-pub async fn grpc_test_client(node: &TestNode) -> ConnectClient<tonic::transport::Channel> {
+pub async fn grpc_test_client(node: &TestNode) -> (ConnectClient<tonic::transport::Channel>, JoinHandle<()>) {
     let (tx, _) = broadcast::channel(120);
-    let addr = SocketAddr::new(std::net::IpAddr::V4(Ipv4Addr::LOCALHOST), 2021);
-    let url = format!("http://{}", addr);
+    let socket = NamedTempFile::new().unwrap();
+    let socket = Arc::new(socket.into_temp_path());
+    std::fs::remove_file(&*socket).unwrap();
 
+    let uds = UnixListener::bind(&*socket).unwrap();
+    let stream = UnixListenerStream::new(uds);
     let handler = GrpcServer::new(node.context.clone(), tx);
 
-    tokio::spawn(async move {
-        tonic::transport::Server::builder()
+    let server = tokio::spawn(async move {
+        let result = tonic::transport::Server::builder()
             .add_service(ConnectServer::new(handler))
-            .serve(addr)
-            .await
-            .expect("gRPC server error");
+            .serve_with_incoming(stream)
+            .await;
+        assert!(result.is_ok());
     });
 
-    ConnectClient::connect(url).await.expect("Unable to create channel")
+    let socket = Arc::clone(&socket);
+    // Connect to the server over a Unix socket
+    // The URL will be ignored.
+    let channel = Endpoint::try_from("http://any.url")
+        .unwrap()
+        .connect_with_connector(service_fn(move |_: Uri| {
+            let socket = Arc::clone(&socket);
+            async move { UnixStream::connect(&*socket).await }
+        }))
+        .await
+        .unwrap();
+
+    let client = ConnectClient::new(channel);
+
+    (client, server)
 }
 
 pub(crate) struct RequestBuilder {

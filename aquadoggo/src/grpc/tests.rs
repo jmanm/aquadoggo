@@ -35,25 +35,33 @@ fn scalar_fields() {
         ];
         let view_id = add_document(&mut node, schema.id(), doc_fields.clone(), &key_pair).await;
 
-        let mut grpc_client = grpc_test_client(&node).await;
-        let mut request = DocumentRequest::default();
-        request.document_view_id = Some(view_id.to_string());
+        let (mut grpc_client, grpc_server) = grpc_test_client(&node).await;
 
-        let response = grpc_client.get_document(request)
-            .await
-            .unwrap()
-            .into_inner();
+        let test_future = async {
+            let mut request = DocumentRequest::default();
+            request.document_view_id = Some(view_id.to_string());
 
-        assert_ne!(response.document, None);
-        let doc = response.document.unwrap();
-        assert!(!doc.fields.is_empty());
+            let response = grpc_client.get_document(request)
+                .await
+                .unwrap()
+                .into_inner();
 
-        let mut field_map = HashMap::new();
-        for field in doc.fields {
-            field_map.insert(field.name.clone(), field);
+            assert_ne!(response.document, None);
+            let doc = response.document.unwrap();
+            assert!(!doc.fields.is_empty());
+
+            let mut field_map = HashMap::new();
+            for field in doc.fields {
+                field_map.insert(field.name.clone(), field);
+            }
+
+            assert_eq!(field_map.len(), doc_fields.len());
+            assert!(matches!(field_map.get("bool").unwrap().value, Some(Value::BoolVal(true))));
+        };
+
+        tokio::select! {
+            _ = grpc_server => panic!("Server returned first"),
+            _ = test_future => ()
         }
-
-        assert_eq!(field_map.len(), doc_fields.len());
-        assert!(matches!(field_map.get("bool").unwrap().value, Some(Value::BoolVal(true))));
     });
 }
