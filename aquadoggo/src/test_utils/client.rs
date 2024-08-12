@@ -96,7 +96,13 @@ pub async fn http_test_client(node: &TestNode) -> TestClient {
     TestClient::new(build_server(http_context))
 }
 
-pub async fn grpc_test_client(node: &TestNode) -> (ConnectClient<tonic::transport::Channel>, JoinHandle<()>) {
+#[allow(dead_code)]
+pub struct GrpcTestClient {
+    server: JoinHandle<()>,
+    pub client: ConnectClient<tonic::transport::Channel>,
+}
+
+pub async fn grpc_test_client(node: &TestNode) -> GrpcTestClient {
     let (tx, _) = broadcast::channel(120);
     let socket = NamedTempFile::new().unwrap();
     let socket = Arc::new(socket.into_temp_path());
@@ -128,7 +134,10 @@ pub async fn grpc_test_client(node: &TestNode) -> (ConnectClient<tonic::transpor
 
     let client = ConnectClient::new(channel);
 
-    (client, server)
+    GrpcTestClient {
+        server,
+        client,
+    }
 }
 
 pub(crate) struct RequestBuilder {
