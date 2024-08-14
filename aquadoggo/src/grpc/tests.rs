@@ -170,8 +170,9 @@ fn relation_fields() {
             document_id: None,
             view_id: Some(parent_view_id.to_string())
         });
-        request.selections.insert("by_relation".to_string(), true);
-        request.selections.insert("by_relation_list".to_string(), true);
+        request.selections.insert("by_relation".into(), true);
+        request.selections.insert("by_pinned_relation".into(), true);
+        request.selections.insert("by_relation_list".into(), true);
 
         let response = test_client.client.get_collection(request).await.unwrap().into_inner();
         assert!(!response.documents.is_empty());
@@ -179,7 +180,7 @@ fn relation_fields() {
         let doc = response.documents.first().unwrap();
         assert!(doc.meta.is_some());
         assert!(doc.cursor.is_some());
-        assert_eq!(doc.fields.len(), 2);
+        assert_eq!(doc.fields.len(), 3);
 
         let field_map = doc.get_field_map();
         let relation_field = field_map.get("by_relation".into());
@@ -190,6 +191,16 @@ fn relation_fields() {
             assert!(matches!(relation_field_map.get("it_works".into()).unwrap().value, Some(Value::BoolVal(true))));
         } else {
             panic!("No relation value!");
+        }
+
+        let pinned_rel_field = field_map.get("by_pinned_relation".into());
+        assert!(pinned_rel_field.is_some());
+
+        if let Some(Value::PinnedRelVal(pinned_rel)) = &pinned_rel_field.unwrap().value {
+            let pinned_rel_field_map = pinned_rel.get_field_map();
+            assert!(matches!(pinned_rel_field_map.get("it_works".into()).unwrap().value, Some(Value::BoolVal(true))));
+        } else {
+            panic!("No pinned relation value!");
         }
 
         let relation_list_field = field_map.get("by_relation_list".into());

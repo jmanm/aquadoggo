@@ -114,7 +114,7 @@ impl GrpcServer {
                     .unwrap();
                 Field {
                     name,
-                    value: Some(Value::RelVal(self.build_document(&related_doc).await?)),
+                    value: Some(Value::PinnedRelVal(self.build_document(&related_doc).await?)),
                 }
             }
 
