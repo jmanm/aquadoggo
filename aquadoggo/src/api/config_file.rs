@@ -21,6 +21,8 @@ const DEFAULT_MAX_DATABASE_CONNECTIONS: u32 = 32;
 
 const DEFAULT_HTTP_PORT: u16 = 2020;
 
+const DEFAULT_GRPC_PORT: u16 = 2021;
+
 const DEFAULT_NODE_PORT: u16 = 2022;
 
 const DEFAULT_WORKER_POOL_SIZE: u32 = 16;
@@ -39,6 +41,10 @@ fn default_max_database_connections() -> u32 {
 
 fn default_http_port() -> u16 {
     DEFAULT_HTTP_PORT
+}
+
+fn default_grpc_port() -> u16 {
+    DEFAULT_GRPC_PORT
 }
 
 fn default_node_port() -> u16 {
@@ -115,6 +121,10 @@ pub struct ConfigFile {
     /// HTTP port for client-node communication, serving the GraphQL API. Defaults to 2020.
     #[serde(default = "default_http_port")]
     pub http_port: u16,
+
+    /// HTTP port for the gRPC API. Defaults to 2021.
+    #[serde(default = "default_grpc_port")]
+    pub grpc_port: u16,
 
     /// Protocol (TCP/QUIC) used for node-node communication and data replication. Defaults to QUIC.
     #[serde(default)]
@@ -234,6 +244,7 @@ impl Default for ConfigFile {
             database_url: default_database_url(),
             database_max_connections: default_max_database_connections(),
             http_port: default_http_port(),
+            grpc_port: default_grpc_port(),
             node_port: default_node_port(),
             blobs_base_path: None,
             mdns: default_mdns(),
@@ -321,6 +332,7 @@ impl TryFrom<ConfigFile> for Configuration {
             database_url: value.database_url,
             database_max_connections: value.database_max_connections,
             http_port: value.http_port,
+            grpc_port: value.grpc_port,
             blobs_base_path,
             worker_pool_size: value.worker_pool_size,
             network: NetworkConfiguration {
