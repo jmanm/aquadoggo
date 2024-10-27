@@ -68,7 +68,8 @@ impl GrpcServer {
         Ok(document)
     }
 
-    async fn build_field(&self, name: String, val: DocumentViewValue) -> Result<Field> {
+    async fn build_field(&self, field_name: &String, val: &DocumentViewValue) -> Result<Field> {
+        let name = field_name.clone();
         let field = match val.value() {
             OperationValue::Boolean(bool) => Field {
                 name,
@@ -135,7 +136,7 @@ impl GrpcServer {
         let futures = match &document.fields {
             Some(fields) => fields
                 .iter()
-                .map(|(name, val)| self.build_field(name.clone(), val.clone()))
+                .map(|(name, val)| self.build_field(name, val))
                 .collect(),
             None => vec![],
         };
