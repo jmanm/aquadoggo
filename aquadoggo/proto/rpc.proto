@@ -6,7 +6,7 @@ service Connect {
   rpc GetCollection(CollectionRequest) returns (CollectionResponse) {}
   rpc GetDocument(DocumentRequest) returns (DocumentResponse) {}
   rpc GetNextArgs(NextArgsRequest) returns (NextArgsResponse) {}
-  rpc DoPublish(PublishRequest) returns (NextArgsResponse) {}
+  rpc Publish(PublishRequest) returns (NextArgsResponse) {}
 }
 
 message CollectionRequest {

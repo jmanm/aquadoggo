@@ -8,7 +8,7 @@ use tonic::{Result, Status};
 
 use crate::aquadoggo_rpc::{self, CollectionRequest};
 use crate::db::query::Cursor;
-use crate::db::query::{self, Direction, Field, Filter, MetaField, Order, Pagination, Select};
+use crate::db::query::{Direction, Field, Filter, MetaField, Order, Pagination, Select};
 use crate::db::stores::{PaginationCursor, Query};
 
 impl CollectionRequest {
@@ -90,10 +90,10 @@ impl CollectionRequest {
 
         if let Some(sort_field) = &self.order_by {
             let order_by = match sort_field.as_str() {
-                "OWNER" => query::Field::Meta(MetaField::Owner),
-                "DOCUMENT_ID" => query::Field::Meta(MetaField::DocumentId),
-                "DOCUMENT_VIEW_ID" => query::Field::Meta(MetaField::DocumentViewId),
-                field_name => query::Field::new(field_name),
+                "OWNER" => Field::Meta(MetaField::Owner),
+                "DOCUMENT_ID" => Field::Meta(MetaField::DocumentId),
+                "DOCUMENT_VIEW_ID" => Field::Meta(MetaField::DocumentViewId),
+                field_name => Field::new(field_name),
             };
             order.field = Some(order_by);
 
@@ -107,7 +107,7 @@ impl CollectionRequest {
         let has_selections = !self.selections.is_empty();
         for (field_name, _) in schema.fields().iter() {
             if !has_selections || self.selections.contains_key(field_name) {
-                let field = query::Field::Field(field_name.clone());
+                let field = Field::Field(field_name.clone());
                 select.add(&field);
             }
         }

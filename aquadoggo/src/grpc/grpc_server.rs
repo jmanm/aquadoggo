@@ -262,7 +262,7 @@ impl Connect for GrpcServer {
         Ok(Response::new(next_args))
     }
 
-    async fn do_publish(
+    async fn publish(
         &self,
         request: Request<PublishRequest>,
     ) -> Result<Response<NextArgsResponse>> {
