@@ -39,7 +39,7 @@ impl GrpcServer {
         &self,
         document_id: Option<DocumentId>,
         document_view_id: Option<DocumentViewId>,
-    ) -> Result<Option<StorageDocument>> {
+    ) -> Result<Option<Document>> {
         let doc = match (document_id, document_view_id) {
             (None, Some(document_view_id)) => {
                 self.context
@@ -55,7 +55,12 @@ impl GrpcServer {
             }
             _ => panic!("Invalid values passed from query field parent"),
         };
-        doc.map_err(|e| Status::internal(e.to_string()))
+        
+        match doc {
+            Ok(Some(storage_doc)) => Ok(Some(self.build_document(&storage_doc).await?)),
+            Ok(None) => Ok(None),
+            Err(e) => Err(Status::internal(e.to_string()))
+        }
     }
 
     async fn get_document_with_cursor(
@@ -103,7 +108,7 @@ impl GrpcServer {
                     .unwrap();
                 Field {
                     name,
-                    value: Some(Value::RelVal(self.build_document(&related_doc).await?)),
+                    value: Some(Value::RelVal(related_doc)),
                 }
             }
 
@@ -115,7 +120,7 @@ impl GrpcServer {
                     .unwrap();
                 Field {
                     name,
-                    value: Some(Value::PinnedRelVal(self.build_document(&related_doc).await?)),
+                    value: Some(Value::PinnedRelVal(related_doc)),
                 }
             }
 
@@ -216,14 +221,7 @@ impl Connect for GrpcServer {
         let document = self
             .get_document_from_store(document_id, document_view_id)
             .await?;
-        let doc_response = match document {
-            Some(document) => DocumentResponse {
-                document: Some(self.build_document(&document).await?),
-            },
-            None => DocumentResponse { document: None },
-        };
-
-        Ok(Response::new(doc_response))
+        Ok(Response::new(DocumentResponse { document }))
     }
 
     async fn get_next_args(
