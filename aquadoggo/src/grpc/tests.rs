@@ -206,11 +206,13 @@ fn relation_fields() {
         let relation_list_field = field_map.get("by_relation_list".into());
         assert!(relation_list_field.is_some());
 
-        // Not implemented
-        // if let Some(Value::RelListVal(rel_list)) = &relation_list_field.unwrap().value {
-
-        // } else {
-        //     panic!("No relation list value!");
-        // }
+        if let Some(Value::RelListVal(rel_list)) = &relation_list_field.unwrap().value {
+            for rel in rel_list.documents.iter() {
+                let rel_field_map = rel.get_field_map();
+                assert!(matches!(rel_field_map.get("it_works".into()).unwrap().value, Some(Value::BoolVal(true))));
+            }
+        } else {
+            panic!("No relation list value!");
+        }
     });
 }

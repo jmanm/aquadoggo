@@ -17,13 +17,14 @@ use tonic::{Request, Response, Result, Status};
 use crate::aquadoggo_rpc::connect_server::Connect;
 use crate::aquadoggo_rpc::field::Value;
 use crate::aquadoggo_rpc::{
-    CollectionRequest, CollectionResponse, Document, DocumentMeta, DocumentRequest,
-    DocumentResponse, Field, NextArgsRequest, NextArgsResponse, PublishRequest,
+    CollectionRequest, CollectionResponse, Document, DocumentList, DocumentMeta, DocumentRequest, DocumentResponse, Field, NextArgsRequest, NextArgsResponse, PublishRequest
 };
 use crate::bus::{ServiceMessage, ServiceSender};
 use crate::context::Context;
 use crate::db::stores::PaginationCursor;
 use crate::db::types::StorageDocument;
+
+use super::utils::try_join_all_limited;
 
 pub struct GrpcServer {
     context: Context,
@@ -112,7 +113,24 @@ impl GrpcServer {
                 }
             }
 
-            // OperationValue::RelationList(RelationList),
+            OperationValue::RelationList(relation_list) => {
+                let futures = relation_list.iter().map(|doc_id|
+                    self.get_document_from_store(Some(doc_id.clone()), None)
+                ).collect();
+                
+                let documents = try_join_all_limited(futures, 10)
+                    .await?
+                    .iter()
+                    .filter(|o| o.is_some())
+                    .map(|o| o.clone().unwrap())
+                    .collect();
+
+                Field {
+                    name,
+                    value: Some(Value::RelListVal(DocumentList { documents }))
+                }
+            }
+
             OperationValue::PinnedRelation(pinned_relation) => {
                 let related_doc = self
                     .get_document_from_store(None, Some(pinned_relation.view_id().clone()))

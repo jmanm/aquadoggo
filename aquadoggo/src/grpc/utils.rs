@@ -154,3 +154,43 @@ impl aquadoggo_rpc::FilterCondition {
         }
     }
 }
+
+use futures::stream::{FuturesOrdered, StreamExt};
+use futures::Future;
+use std::future::Future as StdFuture;
+
+// via ChatGpt
+pub async fn try_join_all_limited<F, T, E>(
+    futures: Vec<F>,
+    max_concurrent: usize,
+) -> Result<Vec<T>, E>
+where
+    F: StdFuture<Output = Result<T, E>>,
+{
+    let mut in_progress = FuturesOrdered::new();
+    let mut results = Vec::new();
+    let mut pending_futures = futures.into_iter();
+
+    while in_progress.len() < max_concurrent {
+        if let Some(next_future) = pending_futures.next() {
+            in_progress.push_back(next_future);
+        } else {
+            break; // No more futures to add
+        }
+    }
+
+    while let Some(next_result) = in_progress.next().await {
+        // Collect the result of the completed future
+        match next_result {
+            Ok(result) => results.push(result),
+            Err(err) => return Err(err), // Return early if any future errors
+        }
+
+        // Replenish the queue with another future if any are still pending
+        if let Some(next_future) = pending_futures.next() {
+            in_progress.push_back(next_future);
+        }
+    }
+
+    Ok(results)
+}
