@@ -1,6 +1,8 @@
 use std::num::NonZeroU64;
 use std::str::FromStr;
+use std::future::Future as StdFuture;
 
+use futures::stream::{FuturesOrdered, StreamExt};
 use p2panda_rs::document::DocumentId;
 use p2panda_rs::operation::{OperationValue, Relation};
 use p2panda_rs::schema::Schema;
@@ -155,11 +157,6 @@ impl aquadoggo_rpc::FilterCondition {
     }
 }
 
-use futures::stream::{FuturesOrdered, StreamExt};
-use futures::Future;
-use std::future::Future as StdFuture;
-
-// via ChatGpt
 pub async fn try_join_all_limited<F, T, E>(
     futures: Vec<F>,
     max_concurrent: usize,

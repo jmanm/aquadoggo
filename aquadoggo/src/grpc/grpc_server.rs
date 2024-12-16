@@ -24,7 +24,9 @@ use crate::context::Context;
 use crate::db::stores::PaginationCursor;
 use crate::db::types::StorageDocument;
 
-use super::utils::try_join_all_limited;
+use super::utils;
+
+const MAX_CONCURRENCY: usize = 10;
 
 pub struct GrpcServer {
     context: Context,
@@ -118,7 +120,7 @@ impl GrpcServer {
                     self.get_document_from_store(Some(doc_id.clone()), None)
                 ).collect();
                 
-                let documents = try_join_all_limited(futures, 10)
+                let documents = utils::try_join_all_limited(futures, MAX_CONCURRENCY)
                     .await?
                     .iter()
                     .filter(|o| o.is_some())
@@ -163,7 +165,7 @@ impl GrpcServer {
                 .collect(),
             None => vec![],
         };
-        let fields = future::try_join_all(futures).await?;
+        let fields = utils::try_join_all_limited(futures, MAX_CONCURRENCY).await?;
 
         Ok(Document {
             meta,
