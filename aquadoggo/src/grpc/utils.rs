@@ -1,6 +1,6 @@
+use std::future::Future as StdFuture;
 use std::num::NonZeroU64;
 use std::str::FromStr;
-use std::future::Future as StdFuture;
 
 use futures::stream::{FuturesOrdered, StreamExt};
 use p2panda_rs::document::DocumentId;

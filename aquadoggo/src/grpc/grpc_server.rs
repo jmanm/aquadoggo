@@ -17,7 +17,8 @@ use tonic::{Request, Response, Result, Status};
 use crate::aquadoggo_rpc::connect_server::Connect;
 use crate::aquadoggo_rpc::field::Value;
 use crate::aquadoggo_rpc::{
-    CollectionRequest, CollectionResponse, Document, DocumentList, DocumentMeta, DocumentRequest, DocumentResponse, Field, NextArgsRequest, NextArgsResponse, PublishRequest
+    CollectionRequest, CollectionResponse, Document, DocumentList, DocumentMeta, DocumentRequest,
+    DocumentResponse, Field, NextArgsRequest, NextArgsResponse, PublishRequest,
 };
 use crate::bus::{ServiceMessage, ServiceSender};
 use crate::context::Context;
@@ -50,19 +51,14 @@ impl GrpcServer {
                     .get_document_by_view_id(&document_view_id)
                     .await
             }
-            (Some(document_id), None) => {
-                self.context
-                    .store
-                    .get_document(&document_id)
-                    .await
-            }
+            (Some(document_id), None) => self.context.store.get_document(&document_id).await,
             _ => panic!("Invalid values passed from query field parent"),
         };
-        
+
         match doc {
             Ok(Some(storage_doc)) => Ok(Some(self.build_document(&storage_doc).await?)),
             Ok(None) => Ok(None),
-            Err(e) => Err(Status::internal(e.to_string()))
+            Err(e) => Err(Status::internal(e.to_string())),
         }
     }
 
@@ -76,8 +72,8 @@ impl GrpcServer {
         Ok(document)
     }
 
-    async fn build_field(&self, field_name: &String, val: &DocumentViewValue) -> Result<Field> {
-        let name = field_name.clone();
+    async fn build_field(&self, field_name: &str, val: &DocumentViewValue) -> Result<Field> {
+        let name = field_name.to_owned();
         let field = match val.value() {
             OperationValue::Boolean(bool) => Field {
                 name,
@@ -116,20 +112,19 @@ impl GrpcServer {
             }
 
             OperationValue::RelationList(relation_list) => {
-                let futures = relation_list.iter().map(|doc_id|
-                    self.get_document_from_store(Some(doc_id.clone()), None)
-                ).collect();
-                
+                let futures = relation_list
+                    .iter()
+                    .map(|doc_id| self.get_document_from_store(Some(doc_id.clone()), None))
+                    .collect();
                 let documents = utils::try_join_all_limited(futures, MAX_CONCURRENCY)
                     .await?
-                    .iter()
-                    .filter(|o| o.is_some())
-                    .map(|o| o.clone().unwrap())
+                    .into_iter()
+                    .flatten()
                     .collect();
 
                 Field {
                     name,
-                    value: Some(Value::RelListVal(DocumentList { documents }))
+                    value: Some(Value::RelListVal(DocumentList { documents })),
                 }
             }
 
@@ -144,8 +139,22 @@ impl GrpcServer {
                 }
             }
 
-            // OperationValue::PinnedRelationList(PinnedRelationList),
-            _ => Field { name, value: None },
+            OperationValue::PinnedRelationList(pinned_relation_list) => {
+                let futures = pinned_relation_list
+                    .iter()
+                    .map(|view_id| self.get_document_from_store(None, Some(view_id.clone())))
+                    .collect();
+                let documents = utils::try_join_all_limited(futures, MAX_CONCURRENCY)
+                    .await?
+                    .into_iter()
+                    .flatten()
+                    .collect();
+
+                Field {
+                    name,
+                    value: Some(Value::PinnedRelListVal(DocumentList { documents })),
+                }
+            }
         };
         Ok(field)
     }
@@ -182,8 +191,8 @@ impl Connect for GrpcServer {
         request: Request<CollectionRequest>,
     ) -> Result<Response<CollectionResponse>> {
         let req = request.into_inner();
-        let schema_id = SchemaId::new(&req.schema_id)
-            .map_err(|e| Status::invalid_argument(e.to_string()))?;
+        let schema_id =
+            SchemaId::new(&req.schema_id).map_err(|e| Status::invalid_argument(e.to_string()))?;
         let schema = self
             .context
             .schema_provider
@@ -250,8 +259,8 @@ impl Connect for GrpcServer {
     ) -> Result<Response<NextArgsResponse>> {
         let req = request.into_inner();
 
-        let public_key = PublicKey::new(&req.public_key)
-            .map_err(|e| Status::invalid_argument(e.to_string()))?;
+        let public_key =
+            PublicKey::new(&req.public_key).map_err(|e| Status::invalid_argument(e.to_string()))?;
 
         let document_view_id = match req.document_view_id {
             Some(id) => Some(
@@ -262,13 +271,10 @@ impl Connect for GrpcServer {
         };
 
         // Calculate next entry's arguments.
-        let (backlink, skiplink, seq_num, log_id) = api::next_args(
-            &self.context.store,
-            &public_key,
-            document_view_id.as_ref(),
-        )
-        .await
-        .map_err(|e| Status::internal(e.to_string()))?;
+        let (backlink, skiplink, seq_num, log_id) =
+            api::next_args(&self.context.store, &public_key, document_view_id.as_ref())
+                .await
+                .map_err(|e| Status::internal(e.to_string()))?;
 
         // Construct and return the next args.
         let next_args = NextArgsResponse {
@@ -290,8 +296,8 @@ impl Connect for GrpcServer {
             hex::decode(&req.entry).map_err(|e| Status::invalid_argument(e.to_string()))?;
         let encoded_entry = EncodedEntry::from_bytes(&entry_bytes);
 
-        let op_bytes = hex::decode(&req.operation)
-            .map_err(|e| Status::invalid_argument(e.to_string()))?;
+        let op_bytes =
+            hex::decode(&req.operation).map_err(|e| Status::invalid_argument(e.to_string()))?;
         let encoded_operation = EncodedOperation::from_bytes(&op_bytes);
 
         debug!(

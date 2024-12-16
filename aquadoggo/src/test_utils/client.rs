@@ -20,12 +20,12 @@ use tower::make::Shared;
 use tower::service_fn;
 use tower_service::Service;
 
-use crate::graphql::GraphQLSchemaManager;
-use crate::http::{build_server, HttpServiceContext};
-use crate::test_utils::TestNode;
 use crate::aquadoggo_rpc::connect_client::ConnectClient;
 use crate::aquadoggo_rpc::connect_server::ConnectServer;
+use crate::graphql::GraphQLSchemaManager;
 use crate::grpc::grpc_server::GrpcServer;
+use crate::http::{build_server, HttpServiceContext};
+use crate::test_utils::TestNode;
 
 /// HTTP client for testing request and responses.
 pub struct TestClient {
@@ -134,10 +134,7 @@ pub async fn grpc_test_client(node: &TestNode) -> GrpcTestClient {
 
     let client = ConnectClient::new(channel);
 
-    GrpcTestClient {
-        server,
-        client,
-    }
+    GrpcTestClient { server, client }
 }
 
 pub(crate) struct RequestBuilder {

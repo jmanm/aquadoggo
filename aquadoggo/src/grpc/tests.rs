@@ -4,8 +4,8 @@ use p2panda_rs::document::DocumentId;
 use p2panda_rs::{schema::FieldType, test_utils::fixtures::random_key_pair};
 use rstest::rstest;
 
-use crate::aquadoggo_rpc::{CollectionRequest, Document, Field, MetaFilter};
 use crate::aquadoggo_rpc::{field::Value, DocumentRequest};
+use crate::aquadoggo_rpc::{CollectionRequest, Document, Field, MetaFilter};
 use crate::test_utils::{add_document, add_schema, grpc_test_client, test_runner, TestNode};
 
 // fn match_or_fail<V, F>(value: Option<V>, test_fn: F, msg: &'static str) where F : FnOnce(V) -> () {
@@ -64,7 +64,9 @@ fn scalar_fields() {
         let mut request = DocumentRequest::default();
         request.document_view_id = Some(view_id.to_string());
 
-        let response = test_client.client.get_document(request)
+        let response = test_client
+            .client
+            .get_document(request)
             .await
             .unwrap()
             .into_inner();
@@ -75,13 +77,19 @@ fn scalar_fields() {
 
         let field_map = doc.get_field_map();
         assert_eq!(field_map.len(), doc_fields.len());
-        assert!(matches!(field_map.get("bool").unwrap().value, Some(Value::BoolVal(true))));
+        assert!(matches!(
+            field_map.get("bool").unwrap().value,
+            Some(Value::BoolVal(true))
+        ));
         if let Some(Value::FloatVal(f)) = field_map.get("float").unwrap().value {
             assert_eq!(1.0, f);
         } else {
             panic!("Didn't get a float!");
         }
-        assert!(matches!(field_map.get("int").unwrap().value, Some(Value::IntVal(1))));
+        assert!(matches!(
+            field_map.get("int").unwrap().value,
+            Some(Value::IntVal(1))
+        ));
         if let Some(Value::StringVal(s)) = &field_map.get("text").unwrap().value {
             assert_eq!(*s, "yes".to_string());
         } else {
@@ -168,19 +176,27 @@ fn relation_fields() {
             deleted: None,
             edited: None,
             document_id: None,
-            view_id: Some(parent_view_id.to_string())
+            view_id: Some(parent_view_id.to_string()),
         });
         request.selections.insert("by_relation".into(), true);
         request.selections.insert("by_pinned_relation".into(), true);
         request.selections.insert("by_relation_list".into(), true);
+        request
+            .selections
+            .insert("by_pinned_relation_list".into(), true);
 
-        let response = test_client.client.get_collection(request).await.unwrap().into_inner();
+        let response = test_client
+            .client
+            .get_collection(request)
+            .await
+            .unwrap()
+            .into_inner();
         assert!(!response.documents.is_empty());
 
         let doc = response.documents.first().unwrap();
         assert!(doc.meta.is_some());
         assert!(doc.cursor.is_some());
-        assert_eq!(doc.fields.len(), 3);
+        assert_eq!(doc.fields.len(), 4);
 
         let field_map = doc.get_field_map();
         let relation_field = field_map.get("by_relation".into());
@@ -188,7 +204,10 @@ fn relation_fields() {
 
         if let Some(Value::RelVal(relation)) = &relation_field.unwrap().value {
             let relation_field_map = relation.get_field_map();
-            assert!(matches!(relation_field_map.get("it_works".into()).unwrap().value, Some(Value::BoolVal(true))));
+            assert!(matches!(
+                relation_field_map.get("it_works".into()).unwrap().value,
+                Some(Value::BoolVal(true))
+            ));
         } else {
             panic!("No relation value!");
         }
@@ -198,21 +217,44 @@ fn relation_fields() {
 
         if let Some(Value::PinnedRelVal(pinned_rel)) = &pinned_rel_field.unwrap().value {
             let pinned_rel_field_map = pinned_rel.get_field_map();
-            assert!(matches!(pinned_rel_field_map.get("it_works".into()).unwrap().value, Some(Value::BoolVal(true))));
+            assert!(matches!(
+                pinned_rel_field_map.get("it_works".into()).unwrap().value,
+                Some(Value::BoolVal(true))
+            ));
         } else {
             panic!("No pinned relation value!");
         }
 
-        let relation_list_field = field_map.get("by_relation_list".into());
-        assert!(relation_list_field.is_some());
+        let rel_list_field = field_map.get("by_relation_list".into());
+        assert!(rel_list_field.is_some());
 
-        if let Some(Value::RelListVal(rel_list)) = &relation_list_field.unwrap().value {
+        if let Some(Value::RelListVal(rel_list)) = &rel_list_field.unwrap().value {
             for rel in rel_list.documents.iter() {
                 let rel_field_map = rel.get_field_map();
-                assert!(matches!(rel_field_map.get("it_works".into()).unwrap().value, Some(Value::BoolVal(true))));
+                assert!(matches!(
+                    rel_field_map.get("it_works".into()).unwrap().value,
+                    Some(Value::BoolVal(true))
+                ));
             }
         } else {
             panic!("No relation list value!");
+        }
+
+        let pinned_rel_list_field = field_map.get("by_pinned_relation_list".into());
+        assert!(pinned_rel_list_field.is_some());
+
+        if let Some(Value::PinnedRelListVal(pinned_rel_list)) =
+            &pinned_rel_list_field.unwrap().value
+        {
+            for pinned_rel in pinned_rel_list.documents.iter() {
+                let pinned_rel_field_map = pinned_rel.get_field_map();
+                assert!(matches!(
+                    pinned_rel_field_map.get("it_works".into()).unwrap().value,
+                    Some(Value::BoolVal(true))
+                ));
+            }
+        } else {
+            panic!("No pinned relation list value!");
         }
     });
 }
