@@ -8,6 +8,7 @@ use crate::{
     aquadoggo_rpc::connect_server::ConnectServer,
     bus::ServiceSender,
     context::Context,
+    grpc::auth_interceptor::AuthInterceptor,
     manager::{ServiceReadySender, Shutdown},
 };
 
@@ -23,9 +24,10 @@ pub async fn grpc_service(
     let grpc_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), grpc_port);
 
     let handler = GrpcServer::new(context, tx);
+    let interceptor = AuthInterceptor {};
 
     Server::builder()
-        .add_service(ConnectServer::new(handler))
+        .add_service(ConnectServer::with_interceptor(handler, interceptor))
         .serve_with_shutdown(grpc_addr, async {
             debug!("gRPC service is ready");
             if tx_ready.send(()).is_err() {
