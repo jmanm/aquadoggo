@@ -38,7 +38,7 @@ pub struct Configuration {
     /// 2020.
     pub http_port: u16,
 
-    /// HTTP port for the gRPC API. Defaults to 2021.
+    /// HTTP port for the gRPC API. Defaults to 50051.
     pub grpc_port: u16,
 
     /// Path to folder where blobs (binary files) are kept and served from.
@@ -65,7 +65,7 @@ impl Default for Configuration {
             database_url: "sqlite::memory:".into(),
             database_max_connections: 32,
             http_port: 2020,
-            grpc_port: 2021,
+            grpc_port: 50051,
             blobs_base_path: PathBuf::new(),
             worker_pool_size: 16,
             network: NetworkConfiguration::default(),
