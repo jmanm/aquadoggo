@@ -1,6 +1,6 @@
 use async_recursion::async_recursion;
 use futures::future;
-use log::debug;
+use log::{debug, warn};
 use p2panda_rs::api::{self, publish};
 use p2panda_rs::document::{DocumentId, DocumentViewId, DocumentViewValue};
 use p2panda_rs::entry::{traits::AsEncodedEntry, EncodedEntry};
@@ -101,13 +101,17 @@ impl GrpcServer {
             },
 
             OperationValue::Relation(relation) => {
-                let related_doc = self
-                    .get_document_from_store(Some(relation.document_id().clone()), None)
+                let doc_id = relation.document_id();
+                let value = self
+                    .get_document_from_store(Some(doc_id.clone()), None)
                     .await?
-                    .unwrap();
+                    .map(|related_doc| Value::RelVal(related_doc));
+                if value.is_none() {
+                    warn!("No relation found for document id {}", doc_id);
+                }
                 Field {
                     name,
-                    value: Some(Value::RelVal(related_doc)),
+                    value,
                 }
             }
 
@@ -129,13 +133,17 @@ impl GrpcServer {
             }
 
             OperationValue::PinnedRelation(pinned_relation) => {
-                let related_doc = self
-                    .get_document_from_store(None, Some(pinned_relation.view_id().clone()))
+                let view_id = pinned_relation.view_id();
+                let value = self
+                    .get_document_from_store(None, Some(view_id().clone()))
                     .await?
-                    .unwrap();
+                    .map(|related_doc| Value::PinnedRelVal(related_doc));
+                if value.is_none() {
+                    warn!("No relation found for document view id {}", view_id);
+                }
                 Field {
                     name,
-                    value: Some(Value::PinnedRelVal(related_doc)),
+                    value,
                 }
             }
 
