@@ -135,7 +135,7 @@ impl GrpcServer {
             OperationValue::PinnedRelation(pinned_relation) => {
                 let view_id = pinned_relation.view_id();
                 let value = self
-                    .get_document_from_store(None, Some(view_id().clone()))
+                    .get_document_from_store(None, Some(view_id.clone()))
                     .await?
                     .map(|related_doc| Value::PinnedRelVal(related_doc));
                 if value.is_none() {
