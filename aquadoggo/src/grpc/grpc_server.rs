@@ -105,14 +105,11 @@ impl GrpcServer {
                 let value = self
                     .get_document_from_store(Some(doc_id.clone()), None)
                     .await?
-                    .map(|related_doc| Value::RelVal(related_doc));
+                    .map(Value::RelVal);
                 if value.is_none() {
                     warn!("No relation found for document id {}", doc_id);
                 }
-                Field {
-                    name,
-                    value,
-                }
+                Field { name, value }
             }
 
             OperationValue::RelationList(relation_list) => {
@@ -137,14 +134,11 @@ impl GrpcServer {
                 let value = self
                     .get_document_from_store(None, Some(view_id.clone()))
                     .await?
-                    .map(|related_doc| Value::PinnedRelVal(related_doc));
+                    .map(Value::PinnedRelVal);
                 if value.is_none() {
                     warn!("No relation found for document view id {}", view_id);
                 }
-                Field {
-                    name,
-                    value,
-                }
+                Field { name, value }
             }
 
             OperationValue::PinnedRelationList(pinned_relation_list) => {
